@@ -1,0 +1,41 @@
+GET car-brands/_search
+{
+  "query": {
+    "match_all": {}
+  }
+}
+
+GET car-brands/_search
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "match": {
+            "models.model.generations.generation.modifications.modification.engine": {
+              "query": "C 63",
+              "operator": "or",
+              "minimum_should_match": "1"
+              
+            }
+          }
+        }
+      ]
+    }
+  },
+  "highlight": {
+    "fields": {
+      "models.model.generations.generation.modifications.modification.engine" :{}
+    }
+  }
+}
+
+
+
+GET car-brands
+
+GET car-brands/_count 
+
+GET _cat/indices
+
+GET car-brands/_mapping

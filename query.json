@@ -1,11 +1,88 @@
-GET car-brands/_search
+GET car_information/_search
 {
   "query": {
     "match_all": {}
   }
 }
-
-GET car-brands/_search
+GET car_information/_search?pretty=true&size=100000
+{
+  "query": {
+    "constant_score": {
+      "filter": {
+        "nested": {
+          "path": "models",
+          "query": {
+            "nested": {
+              "path": "models.model",
+              "query": {
+                "nested": {
+                  "path": "models.model.generations",
+                  "query": {
+                    "nested": {
+                      "path": "models.model.generations.generation",
+                      "query": {
+                        "nested": {
+                          "path": "models.model.generations.generation.modifications",
+                          "query": {
+                            "nested": {
+                              "path": "models.model.generations.generation.modifications.modification",
+                              "query": {
+                                "bool": {
+                                  "should": [
+                                    {
+                                      "match": {
+                                        "models.model.generations.generation.modifications.modification.generation": "smax"
+                                      }
+                                    },
+                                    {
+                                      "match": {
+                                        "models.model.generations.generation.modifications.modification.brand": "smax"
+                                      }
+                                    },
+                                    {
+                                      "match": {
+                                        "models.model.generations.generation.modifications.modification.model": "smax"
+                                      }
+                                    },
+                                    {
+                                      "match": {
+                                        "models.model.generations.generation.modifications.modification.coupe": "smax"
+                                      }
+                                    },
+                                    {
+                                      "match": {
+                                        "models.model.generations.generation.modifications.modification.engine": "smax"
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "boost": 1.2
+    }
+  },
+  "highlight": {
+    "fields": {
+      "models.model.generations.generation.modifications.modification.generation": {},
+      "models.model.generations.generation.modifications.modification.brand": {},
+      "models.model.generations.generation.modifications.modification.model": {},
+      "models.model.generations.generation.modifications.modification.coupe": {},
+      "models.model.generations.generation.modifications.modification.engine": {}
+    }
+  }
+}
+GET car_information/_search
 {
   "query": {
     "bool": {
@@ -29,13 +106,3 @@ GET car-brands/_search
     }
   }
 }
-
-
-
-GET car-brands
-
-GET car-brands/_count 
-
-GET _cat/indices
-
-GET car-brands/_mapping

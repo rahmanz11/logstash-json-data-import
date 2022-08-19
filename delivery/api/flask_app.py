@@ -5,31 +5,11 @@ from textwrap import indent
 from api.elastic_test import connect_elasticsearch
 from flask import request, Flask, Blueprint
 from flask_restx import Api, Resource, fields
-from pprint import pformat
+from flask_httpauth import HTTPBasicAuth
 
 app = Flask(__name__)
 api = Api(app)
-
-request_schema = api.model('Search Request Body', {
-    'keyword': fields.String(readOnly=True, description='keyword')
-})
-
-search_result = {
-    'generationyears': fields.String(readOnly=True, description='generationyears'),
-    'brand': fields.String(readOnly=True, description='brand'),
-    'coupe': fields.String(readOnly=True, description='coupe'),
-    'model': fields.String(readOnly=True, description='model'),
-    'generation': fields.String(readOnly=True, description='generation'),
-    'engine': fields.String(readOnly=True, description='engine'),
-    'productionyears': fields.String(readOnly=True, description='productionyears')
-}
-
-response_schema = api.model('Search Response Body', {
-    'code': fields.Integer(readOnly=True, description='Response code'),
-    'message': fields.String(readOnly=True, description='Response message'),
-    'results': fields.List(fields.Nested(search_result)),
-    'total': fields.Integer(readOnly=True, description='Total')
-})
+auth = HTTPBasicAuth()
 
 formatter = logging.Formatter(fmt='%(asctime)s %(message)s',
                                 datefmt='%Y-%m-%d %H:%M:%S')
@@ -47,10 +27,24 @@ es = connect_elasticsearch()
 
 ns = api.namespace('car', description='Car Search API')
 
+@auth.verify_password
+def authenticate(username, password):
+    if username and password:
+        if username == 'm2u' and password == 'Z$KF@S#SmU':
+            return True
+    return False
+
+@auth.error_handler
+def auth_error():
+    return {
+        'code': 401,
+        'message': 'Please provide auth credential'
+    }
+
 @ns.route('/search')
 class GetSearchResult(Resource):
-    @api.marshal_with(response_schema)
-    @api.expect(request_schema)
+
+    @auth.login_required
     def post(self):
         time = datetime.now()
         keyword = request.json['keyword']
@@ -149,10 +143,7 @@ class GetSearchResult(Resource):
         }
 
         response = {
-            'code': 200,
-            'message': '',
-            'results': [],
-            'total': 0
+            'results': []
         }
 
         try:

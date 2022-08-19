@@ -5,10 +5,11 @@ from textwrap import indent
 from api.elastic_test import connect_elasticsearch
 from flask import request, Flask, Blueprint
 from flask_restx import Api, Resource, fields
-from pprint import pformat
+from flask_httpauth import HTTPBasicAuth
 
 app = Flask(__name__)
 api = Api(app)
+auth = HTTPBasicAuth()
 
 request_schema = api.model('Search Request Body', {
     'keyword': fields.String(readOnly=True, description='keyword')
@@ -47,15 +48,30 @@ es = connect_elasticsearch()
 
 ns = api.namespace('car', description='Car Search API')
 
+@auth.verify_password
+def authenticate(username, password):
+    if username and password:
+        if username == 'm2u' and password == 'Z$KF@S#SmU':
+            return True
+    return False
+
+@auth.error_handler
+def auth_error():
+    return {
+        'code': 401,
+        'message': 'Please provide auth credential'
+    }
+
 @ns.route('/search')
 class GetSearchResult(Resource):
-    @api.marshal_with(response_schema)
-    @api.expect(request_schema)
+    # @api.marshal_with(response_schema)
+    # @api.expect(request_schema)
+    @auth.login_required
     def post(self):
         time = datetime.now()
         keyword = request.json['keyword']
         logger.debug("keyword at %s: %s", time, keyword)
-        
+
         false = False
         query_body = {
             "size": 100000,
@@ -149,10 +165,7 @@ class GetSearchResult(Resource):
         }
 
         response = {
-            'code': 200,
-            'message': '',
-            'results': [],
-            'total': 0
+            'results': []
         }
 
         try:

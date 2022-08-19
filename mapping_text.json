@@ -1,0 +1,134 @@
+PUT car_information
+{
+  "settings": {
+    "index": {
+      "analysis": {
+        "normalizer": {
+          "lower_case_normalizer": {
+            "filter": [
+              "lowercase"
+            ],
+            "type": "custom"
+          }
+        },
+        "filter": {
+          "word_joiner": {
+            "type": "shingle",
+            "output_unigrams": "true",
+            "token_separator": ""
+          }
+        },
+        "analyzer": {
+          "word_join_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": [
+              "lowercase",
+              "word_joiner"
+            ]
+          }
+        }
+      },
+      "max_result_window": 999999999
+    }
+  },
+  "mappings": {
+    "properties": {
+      "models": {
+        "type": "nested",
+        "properties": {
+          "model": {
+            "type": "nested",
+            "properties": {
+              "generations": {
+                "type": "nested",
+                "properties": {
+                  "generation": {
+                    "type": "nested",
+                    "properties": {
+                      "generationyears": {
+                        "type": "text",
+                        "normalizer": "lower_case_normalizer",
+                        "analyzer": "word_join_analyzer"
+                      },
+                      "modifications": {
+                        "type": "nested",
+                        "properties": {
+                          "modification": {
+                            "type": "nested",
+                            "properties": {
+                              "brand": {
+                                "type": "text",
+                                "fields": {
+                                  "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256,
+                                    "normalizer": "lower_case_normalizer"
+                                  }
+                                }
+                              },
+                              "coupe": {
+                                "type": "text",
+                                "fields": {
+                                  "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256,
+                                    "normalizer": "lower_case_normalizer"
+                                  }
+                                }
+                              },
+                              "engine": {
+                                "type": "text",
+                                "fields": {
+                                  "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256,
+                                    "normalizer": "lower_case_normalizer"
+                                  }
+                                }
+                              },
+                              "generation": {
+                                "type": "text",
+                                "fields": {
+                                  "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256,
+                                    "normalizer": "lower_case_normalizer"
+                                  }
+                                }
+                              },
+                              "model": {
+                                "type": "text",
+                                "fields": {
+                                  "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256,
+                                    "normalizer": "lower_case_normalizer"
+                                  }
+                                }
+                              },
+                              "productionyears": {
+                                "type": "text",
+                                "fields": {
+                                  "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256,
+                                    "normalizer": "lower_case_normalizer"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

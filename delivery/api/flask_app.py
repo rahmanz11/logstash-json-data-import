@@ -6,7 +6,7 @@ from api.elastic_test import connect_elasticsearch
 from flask import request, Flask, Blueprint
 from flask_restx import Api, Resource
 from flask_httpauth import HTTPBasicAuth
-from elasticsearch import helpers
+from elasticsearch import helpers, RequestError
 import re
 import time
 
@@ -53,12 +53,14 @@ class GetSearchResult(Resource):
     def post(self):
         start_time = time.time()
         now = datetime.now()
-        keyword = request.json['keyword']
+        keyword = request.json['keyword'].strip()
+        logger.debug("keyword - at: %s, value: %s", now, keyword)
         
         letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
         format = "[^a-zA-Z0-9]*".join(letters)
         value = ".*" + format + ".*"
-
+        logger.debug("search value - at: %s, value: %s", now, value)
+        
         case_insensitive = True
 
         query_body = {
@@ -151,6 +153,8 @@ class GetSearchResult(Resource):
         if ' ' in keyword:
             arr = keyword.split()
             if arr is not None and len(arr) > 0:
+                query_body['query']['bool']['filter'] = []
+                script_str = ''
                 for str in arr:
                     letters = "".join(re.findall("[a-zA-Z0-9]+", str))
                     format = "[^a-zA-Z0-9]*".join(letters)
@@ -177,15 +181,33 @@ class GetSearchResult(Resource):
                             }
                         }
                     })
+                    if script_str:
+                        script_str = script_str + ' && '
+                    script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'
+                
+                _condition_body = ' if (' + script_str + ') { return true } '
+                
+                query_body['query']['bool']['filter'].append(
+                    {
+                    "script": {
+                        "script": {
+                        "source": _condition_body,
+                        "lang": "painless"
+                        }
+                    }
+                    }
+                )    
 
+        logger.debug(query_body)
+        
         response = {
             'results': []
         }
 
         try:
             res = es.search(index="car_search_data", body=query_body)
-        except Exception as e:
-            logger.error(e)
+        except RequestError as e:
+            logger.error(e.info['error']['caused_by']['caused_by']['reason'])
             response['code'] = 500
             response['message'] = 'Error occurred while querying'
             return response

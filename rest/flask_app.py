@@ -204,21 +204,35 @@ class GetSearchResult(Resource):
             }
             data['id'] = hit['_id']
             source = hit['_source']
-            if 'generationyears' in source:
+            if 'generationyears' in source \
+                and source['generationyears'] is not None \
+                    and source['generationyears']:
                 data['generationyears'] = ''.join(source['generationyears'])
-            if 'brand' in source:
+            if 'brand' in source \
+                and source['brand'] is not None \
+                    and source['brand']:
                 data['brand'] = ''.join(source['brand'])
-            if 'coupe' in source:
+            if 'coupe' in source \
+                and source['coupe'] is not None \
+                    and source['coupe']:
                 data['coupe'] = ''.join(source['coupe'])
-            if 'model' in source:
+            if 'model' in source \
+                and source['model'] is not None \
+                    and source['model']:
                 data['model'] = ''.join(source['model'])
-            if 'generation' in source:
+            if 'generation' in source \
+                and source['generation'] is not None \
+                    and source['generation']:
                 data['generation'] = ''.join(source['generation'])
-            if 'engine' in source:
+            if 'engine' in source \
+                and source['engine'] is not None \
+                    and source['engine']:
                 data['engine'] = ''.join(source['engine'])
-            if 'productionyears' in source:
+            if 'productionyears' in source \
+                and source['productionyears'] is not None \
+                    and source['productionyears']:
                 data['productionyears'] = ''.join(source['productionyears'])
-                
+
             _list.append(data)
 
         response['results'] = _list

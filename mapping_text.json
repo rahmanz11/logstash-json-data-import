@@ -1,36 +1,46 @@
 PUT car_information
 {
   "settings": {
-    "index": {
-      "analysis": {
-        "normalizer": {
-          "lower_case_normalizer": {
-            "filter": [
-              "lowercase"
-            ],
-            "type": "custom"
-          }
+    "analysis": {
+      "analyzer": {
+        "autocomplete": {
+          "tokenizer": "autocomplete",
+          "filter": [
+            "lowercase"
+          ]
         },
-        "filter": {
-          "word_joiner": {
-            "type": "shingle",
-            "output_unigrams": "true",
-            "token_separator": ""
-          }
+        "tokenize_on_chars": {
+          "tokenizer": "tokenize_on_chars",
+          "filter": [
+            "lowercase"
+          ]
         },
-        "analyzer": {
-          "word_join_analyzer": {
-            "type": "custom",
-            "tokenizer": "standard",
-            "filter": [
-              "lowercase",
-              "word_joiner"
-            ]
-          }
+        "autocomplete_search": {
+          "tokenizer": "lowercase"
         }
       },
-      "max_result_window": 999999999
-    }
+      "tokenizer": {
+        "autocomplete": {
+          "type": "edge_ngram",
+          "min_gram": 1,
+          "max_gram": 10,
+          "token_chars": [
+            "letter",
+            "digit"
+          ]
+        },
+        "tokenize_on_chars": {
+          "type": "char_group",
+          "tokenize_on_chars": [
+            "whitespace",
+            "-",
+            "\n",
+            ","
+          ]
+        }
+      }
+    },
+    "max_result_window": 999999999
   },
   "mappings": {
     "properties": {
@@ -48,8 +58,7 @@ PUT car_information
                     "properties": {
                       "generationyears": {
                         "type": "text",
-                        "normalizer": "lower_case_normalizer",
-                        "analyzer": "word_join_analyzer"
+                        "analyzer": "tokenize_on_chars"
                       },
                       "modifications": {
                         "type": "nested",
@@ -59,63 +68,32 @@ PUT car_information
                             "properties": {
                               "brand": {
                                 "type": "text",
-                                "fields": {
-                                  "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256,
-                                    "normalizer": "lower_case_normalizer"
-                                  }
-                                }
+                                "analyzer": "autocomplete",
+                                "search_analyzer": "autocomplete_search"
                               },
                               "coupe": {
                                 "type": "text",
-                                "fields": {
-                                  "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256,
-                                    "normalizer": "lower_case_normalizer"
-                                  }
-                                }
+                                "analyzer": "autocomplete",
+                                "search_analyzer": "autocomplete_search"
                               },
                               "engine": {
                                 "type": "text",
-                                "fields": {
-                                  "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256,
-                                    "normalizer": "lower_case_normalizer"
-                                  }
-                                }
+                                "analyzer": "autocomplete",
+                                "search_analyzer": "autocomplete_search"
                               },
                               "generation": {
                                 "type": "text",
-                                "fields": {
-                                  "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256,
-                                    "normalizer": "lower_case_normalizer"
-                                  }
-                                }
+                                "analyzer": "autocomplete",
+                                "search_analyzer": "autocomplete_search"
                               },
                               "model": {
                                 "type": "text",
-                                "fields": {
-                                  "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256,
-                                    "normalizer": "lower_case_normalizer"
-                                  }
-                                }
+                                "analyzer": "autocomplete",
+                                "search_analyzer": "autocomplete_search"
                               },
                               "productionyears": {
                                 "type": "text",
-                                "fields": {
-                                  "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256,
-                                    "normalizer": "lower_case_normalizer"
-                                  }
-                                }
+                                "analyzer": "tokenize_on_chars"
                               }
                             }
                           }

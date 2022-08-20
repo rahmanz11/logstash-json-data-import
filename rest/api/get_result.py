@@ -8,7 +8,6 @@ from flask_restx import Resource, fields
 from flask import Flask, Blueprint
 from flask_restx import Api
 from api.elastic_test import connect_elasticsearch
-from api.get_result import ns
 
 request_schema = api.model('Search Request Body', {
     'keyword': fields.String(readOnly=True, description='keyword')
@@ -148,6 +147,83 @@ class GetSearchResult(Resource):
             }
         }
 
+        response = {
+            'code': 200,
+            'message': '',
+            'results': [],
+            'total': 0
+        }
+
+        time = datetime.now()
+        logger.debug("es query at %s: %s", time, query_body)
+        try:
+            res = es.search(index="car_information", body=query_body)
+        except Exception as e:
+            logger.error(e)
+            response['code'] = 500
+            response['message'] = 'Error occurred while querying'
+            return response
+        
+        hits = res['hits']['hits']
+        total_hits = len(hits)
+        
+        logger.debug("total hits at %s: %s", time, total_hits)
+
+        if hits is not None and len(hits) > 0: 
+            for hit in hits:
+                if hit['fields'] is not None and hit['fields']['models'] is not None and len(hit['fields']['models']) > 0:
+                    for model in hit['fields']['models']:
+                        for mv in model.values():
+                            for imv in mv:
+                                for imvs in imv.values():
+                                    for gns in imvs:
+                                        for gnv in gns.values():
+                                            for gn in gnv:
+                                                data = {}
+                                                data_available = False
+                                                if 'generationyears' in gn:
+                                                    data['generationyears'] = gn['generationyears']
+                                                    data_available = True
+                                                    
+                                                if 'modifications' in gn:
+                                                    for ms in gn['modifications']:
+                                                        for m in ms.values():
+                                                            for modification in m:
+                                                                if 'brand' in modification:
+                                                                    data['brand'] = modification['brand']
+                                                                    data_available = True
+                                                                if 'coupe' in modification:
+                                                                    data['coupe'] = modification['coupe']
+                                                                    data_available = True
+                                                                if 'model' in modification:
+                                                                    data['model'] = modification['model']
+                                                                    data_available = True
+                                                                if 'generation' in modification:
+                                                                    data['generation'] = modification['generation']
+                                                                    data_available = True
+                                                                if 'engine' in modification:
+                                                                    data['engine'] = modification['engine']
+                                                                    data_available = True
+                                                                if 'productionyears' in modification:
+                                                                    data['productionyears'] = modification['productionyears']
+                                                                    data_available = True
+                                                            
+                                                
+                                                if data_available:
+                                                    response["results"].append(data)
+
+        return response
+
+@ns.route('/reindex')
+class ReIndex(Resource):
+    def post(self):
+        query_body = {
+            "size": 100000,
+            "query": {
+                "match_all": {
+                }
+            }
+        }
         response = {
             'code': 200,
             'message': '',

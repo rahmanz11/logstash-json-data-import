@@ -56,7 +56,7 @@ class GetSearchResult(Resource):
         keyword = request.json['keyword']
         
         letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
-        format = " *".join(letters)
+        format = "[^a-zA-Z0-9]*".join(letters)
         value = ".*" + format + ".*"
 
         case_insensitive = True

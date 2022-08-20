@@ -57,7 +57,7 @@ class GetSearchResult(Resource):
         logger.debug("keyword - at: %s, value: %s", now, keyword)
         
         letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
-        format = " *".join(letters)
+        format = "[^a-zA-Z0-9]*".join(letters)
         value = ".*" + format + ".*"
         logger.debug("search value - at: %s, value: %s", now, value)
         

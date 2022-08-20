@@ -53,7 +53,7 @@ class GetSearchResult(Resource):
     def post(self):
         start_time = time.time()
         now = datetime.now()
-        keyword = request.json['keyword']
+        keyword = request.json['keyword'].strip()
         logger.debug("keyword - at: %s, value: %s", now, keyword)
         
         letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
@@ -127,14 +127,14 @@ class GetSearchResult(Resource):
                         {
                             "match": {
                                 "productionyears": {
-                                    "query": "c63"
+                                    "query": value
                                 }
                             }
                         },
                         {
                             "match": {
                                 "generationyears": {
-                                    "query": "c63"
+                                    "query": value
                                 }
                             }
                         }
@@ -149,6 +149,36 @@ class GetSearchResult(Resource):
                 }
             ]
         }
+
+        if ' ' in keyword:
+            arr = keyword.split()
+            if arr is not None and len(arr) > 0:
+                for str in arr:
+                    letters = "".join(re.findall("[a-zA-Z0-9]+", str))
+                    format = "[^a-zA-Z0-9]*".join(letters)
+                    value = ".*" + format + ".*"
+                    query_body['query']['bool']['should'].append({
+                        "regexp": {
+                            "generation.keyword": {
+                                "value": value,
+                                "flags": "ALL",
+                                "case_insensitive": case_insensitive,
+                                "max_determinized_states": 10000,
+                                "rewrite": "constant_score"
+                            }
+                        }
+                    })
+                    query_body['query']['bool']['should'].append({
+                        "regexp": {
+                            "engine.keyword": {
+                                "value": value,
+                                "flags": "ALL",
+                                "case_insensitive": case_insensitive,
+                                "max_determinized_states": 10000,
+                                "rewrite": "constant_score"
+                            }
+                        }
+                    })
 
         response = {
             'results': []

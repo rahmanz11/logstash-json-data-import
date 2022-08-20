@@ -386,3 +386,27 @@ GET car_search_data/_search
     }
   ]
 }
+
+
+GET car_search_data/_search
+{
+  "size": 10000000,
+  "query": {
+          "regexp": {
+            "combined.keyword": {
+              "value": ".*c[^a-zA-Z0-9]*6[^a-zA-Z0-9]*3.*a[^a-zA-Z0-9]*m[^a-zA-Z0-9]*g.*",
+              "flags": "ALL",
+              "case_insensitive": true,
+              "max_determinized_states": 10000,
+              "rewrite": "constant_score"
+            }
+          }
+  },
+  "sort": [
+    {
+      "_score": {
+        "order": "desc"
+      }
+    }
+  ]
+}

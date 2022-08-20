@@ -129,23 +129,6 @@ PUT car_search_data
           ],
           "type": "custom"
         }
-      },
-      "filter": {
-        "autocomplete_filter": {
-          "type": "edge_ngram",
-          "min_gram": 1,
-          "max_gram": 20
-        }
-      },
-      "analyzer": {
-        "autocomplete": {
-          "type": "custom",
-          "tokenizer": "standard",
-          "filter": [
-            "lowercase",
-            "autocomplete_filter"
-          ]
-        }
       }
     },
     "max_result_window": 999999999
@@ -215,12 +198,38 @@ PUT car_search_data
       "productionyears": {
         "type": "text",
         "analyzer": "standard",
-        "search_analyzer": "standard"
+        "search_analyzer": "standard",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256,
+            "normalizer": "lower_case_normalizer"
+          }
+        }
       },
       "generationyears": {
         "type": "text",
         "analyzer": "standard",
-        "search_analyzer": "standard"
+        "search_analyzer": "standard",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256,
+            "normalizer": "lower_case_normalizer"
+          }
+        }
+      },
+      "combined": {
+        "type": "text",
+        "analyzer": "standard",
+        "search_analyzer": "standard",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256,
+            "normalizer": "lower_case_normalizer"
+          }
+        }
       }
     }
   }

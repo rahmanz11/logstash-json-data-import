@@ -51,16 +51,133 @@ def auth_error():
 class GetSearchResult(Resource):
     @auth.login_required
     def post(self):
+        
+        start_time = time.time()
+        now = datetime.now()
+        
+        value = ''
+        keyword = request.json['keyword'].strip()
+        logger.debug("keyword - at: %s, value: %s", now, keyword)
+        
+        if ' ' in keyword:
+            arr = keyword.split()
+            if arr is not None and len(arr) > 0:
+                for str in arr:
+                    letters = "".join(re.findall("[a-zA-Z0-9]+", str))
+                    format = "[^a-zA-Z0-9]*".join(letters)
+                    if not value:
+                        value = value + ".*" + format + ".*"
+                    else:
+                        value = value + format + ".*"
+        else:
+            letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
+            format = "[^a-zA-Z0-9]*".join(letters)
+            value = ".*" + format + ".*"
+
+        logger.debug("search value - at: %s, value: %s", now, value)
+
+        case_insensitive = True
+
+        query_body = {
+            "size": 10000000,
+            "query": {
+                "regexp": {
+                    "combined.keyword": {
+                        "value": value,
+                        "flags": "ALL",
+                        "case_insensitive": case_insensitive,
+                        "max_determinized_states": 10000,
+                        "rewrite": "constant_score"
+                    }
+                }
+            },
+            "sort": [
+                {
+                    "_score": {
+                        "order": "desc"
+                    }
+                }
+            ]
+        }
+
+        logger.debug(query_body)
+
+        response = {
+            'results': []
+        }
+
+        try:
+            res = es.search(index="car_search_data", body=query_body)
+        except RequestError as e:
+            logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+            response['code'] = 500
+            response['message'] = 'Error occurred while querying'
+            return response
+        _list = []
+        hits = res['hits']['hits']
+        for hit in hits:
+            data = {
+                'generationyears': None,
+                'brand': None,
+                'coupe': None,
+                'model': None,
+                'generation': None,
+                'productionyears': None,
+                'combined': None
+            }
+            data['id'] = hit['_id']
+            source = hit['_source']
+            if 'brand' in source \
+                and source['brand'] is not None \
+                    and source['brand']:
+                data['brand'] = ''.join(source['brand'])
+            if 'coupe' in source \
+                and source['coupe'] is not None \
+                    and source['coupe']:
+                data['coupe'] = ''.join(source['coupe'])
+            if 'model' in source \
+                and source['model'] is not None \
+                    and source['model']:
+                data['model'] = ''.join(source['model'])
+            if 'generation' in source \
+                and source['generation'] is not None \
+                    and source['generation']:
+                data['generation'] = ''.join(source['generation'])
+            if 'engine' in source \
+                and source['engine'] is not None \
+                    and source['engine']:
+                data['engine'] = ''.join(source['engine'])
+            if 'productionyears' in source \
+                and source['productionyears'] is not None \
+                    and source['productionyears']:
+                data['productionyears'] = ''.join(source['productionyears'])
+            if 'generationyears' in source \
+                and source['generationyears'] is not None \
+                    and source['generationyears']:
+                data['generationyears'] = ''.join(source['generationyears'])
+
+            _list.append(data)
+
+        response['results'] = _list
+        logger.debug("total time spent - at: %s, value: %s",
+                     now, (time.time() - start_time))
+        return response
+
+
+@ns.route('/search_')
+class GetSearchResult(Resource):
+    @auth.login_required
+    def post(self):
         start_time = time.time()
         now = datetime.now()
         keyword = request.json['keyword'].strip()
         logger.debug("keyword - at: %s, value: %s", now, keyword)
-        
+
         letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
         format = "[^a-zA-Z0-9]*".join(letters)
         value = ".*" + format + ".*"
         logger.debug("search value - at: %s, value: %s", now, value)
-        
+
         case_insensitive = True
 
         query_body = {
@@ -183,23 +300,26 @@ class GetSearchResult(Resource):
                     })
                     if script_str:
                         script_str = script_str + ' && '
-                    script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'
-                
+                    script_str = script_str + \
+                        '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + \
+                        value + \
+                        '/i.matcher(doc["engine.keyword"].value).matches())'
+
                 _condition_body = ' if (' + script_str + ') { return true } '
-                
+
                 query_body['query']['bool']['filter'].append(
                     {
-                    "script": {
                         "script": {
-                        "source": _condition_body,
-                        "lang": "painless"
+                            "script": {
+                                "source": _condition_body,
+                                "lang": "painless"
+                            }
                         }
                     }
-                    }
-                )    
+                )
 
         logger.debug(query_body)
-        
+
         response = {
             'results': []
         }
@@ -221,13 +341,10 @@ class GetSearchResult(Resource):
                 'model': None,
                 'generation': None,
                 'productionyears': None,
+                'combined': None
             }
             data['id'] = hit['_id']
             source = hit['_source']
-            if 'generationyears' in source \
-                and source['generationyears'] is not None \
-                    and source['generationyears']:
-                data['generationyears'] = ''.join(source['generationyears'])
             if 'brand' in source \
                 and source['brand'] is not None \
                     and source['brand']:
@@ -252,11 +369,16 @@ class GetSearchResult(Resource):
                 and source['productionyears'] is not None \
                     and source['productionyears']:
                 data['productionyears'] = ''.join(source['productionyears'])
+            if 'generationyears' in source \
+                and source['generationyears'] is not None \
+                    and source['generationyears']:
+                data['generationyears'] = ''.join(source['generationyears'])
 
             _list.append(data)
 
         response['results'] = _list
-        logger.debug("total time spent - at: %s, value: %s", now, (time.time() - start_time) )
+        logger.debug("total time spent - at: %s, value: %s",
+                     now, (time.time() - start_time))
         return response
 
 
@@ -506,26 +628,52 @@ class ReIndex(Resource):
                                                                     'model': None,
                                                                     'generation': None,
                                                                     'productionyears': None,
+                                                                    'combined': None
                                                                 }
-                                                                data['generationyears'] = generationyears
+                                                                space = ' '
+                                                                combined = ''
+
                                                                 if 'brand' in modification:
                                                                     data['brand'] = ''.join(
                                                                         modification['brand'])
+                                                                    combined = combined + \
+                                                                        data['brand'] + \
+                                                                        space
                                                                 if 'coupe' in modification:
                                                                     data['coupe'] = ''.join(
                                                                         modification['coupe'])
+                                                                    combined = combined + \
+                                                                        data['coupe'] + \
+                                                                        space
                                                                 if 'model' in modification:
                                                                     data['model'] = ''.join(
                                                                         modification['model'])
+                                                                    combined = combined + \
+                                                                        data['model'] + \
+                                                                        space
                                                                 if 'generation' in modification:
                                                                     data['generation'] = ''.join(
                                                                         modification['generation'])
+                                                                    combined = combined + \
+                                                                        data['generation'] + \
+                                                                        space
                                                                 if 'engine' in modification:
                                                                     data['engine'] = ''.join(
                                                                         modification['engine'])
+                                                                    combined = combined + \
+                                                                        data['engine'] + \
+                                                                        space
                                                                 if 'productionyears' in modification:
                                                                     data['productionyears'] = ''.join(
                                                                         modification['productionyears'])
+                                                                    combined = combined + \
+                                                                        data['productionyears'] + space
+                                                                if generationyears:
+                                                                    data['generationyears'] = generationyears
+                                                                    combined = combined + \
+                                                                        data['generationyears']
+
+                                                                data['combined'] = combined
 
                                                                 list.append(
                                                                     data)

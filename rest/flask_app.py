@@ -207,18 +207,18 @@ class GetSearchResult(Resource):
             if 'generationyears' in source:
                 data['generationyears'] = ''.join(source['generationyears'])
             if 'brand' in source:
-                data['brand'] = ''.join(''.join(source['brand']))
-            if 'brand' in source:
-                data['coupe'] = ''.join(''.join(source['coupe']))
-            if 'brand' in source:
-                data['model'] = ''.join(''.join(source['model']))
-            if 'brand' in source:
-                data['generation'] = ''.join(''.join(source['generation']))
-            if 'brand' in source:
-                data['engine'] = ''.join(''.join(source['engine']))
-            if 'brand' in source:
-                data['productionyears'] = ''.join(
-                    ''.join(source['productionyears']))
+                data['brand'] = ''.join(source['brand'])
+            if 'coupe' in source:
+                data['coupe'] = ''.join(source['coupe'])
+            if 'model' in source:
+                data['model'] = ''.join(source['model'])
+            if 'generation' in source:
+                data['generation'] = ''.join(source['generation'])
+            if 'engine' in source:
+                data['engine'] = ''.join(source['engine'])
+            if 'productionyears' in source:
+                data['productionyears'] = ''.join(source['productionyears'])
+                
             _list.append(data)
 
         response['results'] = _list

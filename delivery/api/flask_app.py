@@ -9,11 +9,14 @@ from flask_httpauth import HTTPBasicAuth
 from elasticsearch import helpers, RequestError
 import re
 import time
+from flask_cors import CORS
+
 
 app = Flask(__name__)
 api = Api(app)
 auth = HTTPBasicAuth()
-
+# CORS(app)
+CORS(app, resources={r"/car/*": {"origins": "*"}})
 formatter = logging.Formatter(fmt='%(asctime)s %(message)s',
                               datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger("Car Search Log")

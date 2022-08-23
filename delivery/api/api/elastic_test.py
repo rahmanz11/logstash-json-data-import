@@ -8,8 +8,6 @@ def connect_elasticsearch(**kwargs):
     _es_secret = get_config_value('elastic', 'es_secret')
     _es_port = get_config_value('elastic', 'es_port')
     _es_config = ['http://' + _es_user + ':' + _es_secret + '@' + _es_host + ':' + _es_port + '/']
-    if 'hosts' in kwargs.keys():
-        _es_hosts = kwargs['hosts']
     _es_obj = None
     _es_obj = Elasticsearch(_es_config, timeout=10)
     if _es_obj.ping():

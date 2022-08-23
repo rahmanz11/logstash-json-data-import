@@ -15,7 +15,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 api = Api(app)
 auth = HTTPBasicAuth()
-# CORS(app)
+
 CORS(app, resources={r"/car/*": {"origins": "*"}})
 formatter = logging.Formatter(fmt='%(asctime)s %(message)s',
                               datefmt='%Y-%m-%d %H:%M:%S')
@@ -57,41 +57,112 @@ class GetSearchResult(Resource):
         
         start_time = time.time()
         now = datetime.now()
-        
+        response = {
+            'results': []
+        }
+
         value = ''
         keyword = request.json['keyword'].strip()
         logger.debug("keyword - at: %s, value: %s", now, keyword)
         
-        if ' ' in keyword:
-            arr = keyword.split()
-            if arr is not None and len(arr) > 0:
-                for str in arr:
-                    letters = "".join(re.findall("[a-zA-Z0-9]+", str))
-                    format = "[^a-zA-Z0-9]*".join(letters)
-                    if not value:
-                        value = value + ".*" + format + ".*"
-                    else:
-                        value = value + format + ".*"
-        else:
-            letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
-            format = "[^a-zA-Z0-9]*".join(letters)
-            value = ".*" + format + ".*"
+        if not keyword:
+            return {
+                'code': 401,
+                'message': 'Please provide input'
+            }
 
+        regex_letters = "[a-zA-Z0-9]+"
+        if re.search(regex_letters, keyword) is None or len(keyword) < 3:
+            return {
+                'code': 401,
+                'message': 'Please provide valid input of minimum 3 characters'
+            }
+
+        regex_query = "[^a-zA-Z0-9$&+,:;=?@#|'<>.^*()%!]*"
+
+        letters = "".join(re.findall(regex_letters, keyword))
+
+        format = regex_query.join(letters)
+        value = ".*" + format + ".*"
         logger.debug("search value - at: %s, value: %s", now, value)
 
         case_insensitive = True
-
         query_body = {
             "size": 10000000,
             "query": {
-                "regexp": {
-                    "combined.keyword": {
-                        "value": value,
-                        "flags": "ALL",
-                        "case_insensitive": case_insensitive,
-                        "max_determinized_states": 10000,
-                        "rewrite": "constant_score"
-                    }
+                "bool": {
+                    "minimum_should_match": 1,
+                    "should": [
+                        {
+                            "regexp": {
+                                "generation.keyword": {
+                                    "value": value,
+                                    "flags": "ALL",
+                                    "case_insensitive": case_insensitive,
+                                    "max_determinized_states": 10000,
+                                    "rewrite": "constant_score"
+                                }
+                            }
+                        },
+                        {
+                            "regexp": {
+                                "brand.keyword": {
+                                    "value": value,
+                                    "flags": "ALL",
+                                    "case_insensitive": case_insensitive,
+                                    "max_determinized_states": 10000,
+                                    "rewrite": "constant_score"
+                                }
+                            }
+                        },
+                        {
+                            "regexp": {
+                                "model.keyword": {
+                                    "value": value,
+                                    "flags": "ALL",
+                                    "case_insensitive": case_insensitive,
+                                    "max_determinized_states": 10000,
+                                    "rewrite": "constant_score"
+                                }
+                            }
+                        },
+                        {
+                            "regexp": {
+                                "coupe.keyword": {
+                                    "value": value,
+                                    "flags": "ALL",
+                                    "case_insensitive": case_insensitive,
+                                    "max_determinized_states": 10000,
+                                    "rewrite": "constant_score"
+                                }
+                            }
+                        },
+                        {
+                            "regexp": {
+                                "engine.keyword": {
+                                    "value": value,
+                                    "flags": "ALL",
+                                    "case_insensitive": case_insensitive,
+                                    "max_determinized_states": 10000,
+                                    "rewrite": "constant_score"
+                                }
+                            }
+                        },
+                        {
+                            "match": {
+                                "productionyears": {
+                                    "query": value
+                                }
+                            }
+                        },
+                        {
+                            "match": {
+                                "generationyears": {
+                                    "query": value
+                                }
+                            }
+                        }
+                    ]
                 }
             },
             "sort": [
@@ -103,11 +174,8 @@ class GetSearchResult(Resource):
             ]
         }
 
-        logger.debug(query_body)
-
-        response = {
-            'results': []
-        }
+        logger.debug("search query: %s", query_body)       
+        _list = []
 
         try:
             res = es.search(index="car_search_data", body=query_body)
@@ -116,50 +184,168 @@ class GetSearchResult(Resource):
             response['code'] = 500
             response['message'] = 'Error occurred while querying'
             return response
-        _list = []
-        hits = res['hits']['hits']
-        for hit in hits:
-            data = {
-                'generationyears': None,
-                'brand': None,
-                'coupe': None,
-                'model': None,
-                'generation': None,
-                'productionyears': None,
-                'combined': None
-            }
-            data['id'] = hit['_id']
-            source = hit['_source']
-            if 'brand' in source \
-                and source['brand'] is not None \
-                    and source['brand']:
-                data['brand'] = ''.join(source['brand'])
-            if 'coupe' in source \
-                and source['coupe'] is not None \
-                    and source['coupe']:
-                data['coupe'] = ''.join(source['coupe'])
-            if 'model' in source \
-                and source['model'] is not None \
-                    and source['model']:
-                data['model'] = ''.join(source['model'])
-            if 'generation' in source \
-                and source['generation'] is not None \
-                    and source['generation']:
-                data['generation'] = ''.join(source['generation'])
-            if 'engine' in source \
-                and source['engine'] is not None \
-                    and source['engine']:
-                data['engine'] = ''.join(source['engine'])
-            if 'productionyears' in source \
-                and source['productionyears'] is not None \
-                    and source['productionyears']:
-                data['productionyears'] = ''.join(source['productionyears'])
-            if 'generationyears' in source \
-                and source['generationyears'] is not None \
-                    and source['generationyears']:
-                data['generationyears'] = ''.join(source['generationyears'])
 
-            _list.append(data)
+        
+        hits = res['hits']['hits']
+        
+        if hits is None or len(hits) <= 0:
+            value = ''
+            if ' ' in keyword:
+                arr = keyword.split()
+                if arr is not None and len(arr) > 0:
+                    for str in arr:
+                        letters = "".join(re.findall(regex_letters, str))
+                        format = regex_query.join(letters)
+                        if not value:
+                            value = value + ".*" + format + ".*"
+                        else:
+                            value = value + format + ".*"
+            else:
+                letters = "".join(re.findall(regex_letters, keyword))
+                format = regex_query.join(letters)
+                value = ".*" + format + ".*"
+
+            logger.debug("search value - at: %s, value: %s", now, value)
+
+            case_insensitive = True
+
+            combined_query_body = {
+                "size": 10000000,
+                "query": {
+                    "regexp": {
+                        "combined.keyword": {
+                            "value": value,
+                            "flags": "ALL",
+                            "case_insensitive": case_insensitive,
+                            "max_determinized_states": 10000,
+                            "rewrite": "constant_score"
+                        }
+                    }
+                },
+                "sort": [
+                    {
+                        "_score": {
+                            "order": "desc"
+                        }
+                    }
+                ]
+            }
+
+            logger.debug("re-search, query : %s", combined_query_body)
+
+            try:
+                res = es.search(index="car_search_data", body=combined_query_body)
+            except RequestError as e:
+                logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                response['code'] = 500
+                response['message'] = 'Error occurred while querying'
+                return response
+
+            
+            hits = res['hits']['hits']
+
+        if hits is None or len(hits) <= 0:
+            if ' ' in keyword:
+                arr = keyword.split()
+                if arr is not None and len(arr) > 0:
+                    query_body['query']['bool']['filter'] = []
+                    script_str = ''
+                    for str in arr:
+                        letters = "".join(re.findall(regex_letters, str))
+                        format = regex_query.join(letters)
+                        value = ".*" + format + ".*"
+                        query_body['query']['bool']['should'].append({
+                            "regexp": {
+                                "generation.keyword": {
+                                    "value": value,
+                                    "flags": "ALL",
+                                    "case_insensitive": case_insensitive,
+                                    "max_determinized_states": 10000,
+                                    "rewrite": "constant_score"
+                                }
+                            }
+                        })
+                        query_body['query']['bool']['should'].append({
+                            "regexp": {
+                                "engine.keyword": {
+                                    "value": value,
+                                    "flags": "ALL",
+                                    "case_insensitive": case_insensitive,
+                                    "max_determinized_states": 10000,
+                                    "rewrite": "constant_score"
+                                }
+                            }
+                        })
+                        if script_str:
+                            script_str = script_str + ' && '
+                        script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'                    
+                    
+                    _condition_body = ' if (' + script_str + ') { return true } '
+                    
+                    query_body['query']['bool']['filter'].append(
+                        {
+                        "script": {
+                            "script": {
+                            "source": _condition_body,
+                            "lang": "painless"
+                            }
+                        }
+                        }
+                    )   
+
+                logger.debug("re-re-search, query : %s", query_body)
+                try:
+                    res = es.search(index="car_search_data", body=query_body)
+                except RequestError as e:
+                    logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                    response['code'] = 500
+                    response['message'] = 'Error occurred while querying'
+                    return response
+
+                hits = res['hits']['hits']
+        
+        if hits and len(hits) > 0:
+            for hit in hits:
+                data = {
+                    'generationyears': None,
+                    'brand': None,
+                    'coupe': None,
+                    'model': None,
+                    'generation': None,
+                    'productionyears': None
+                }
+                data['id'] = hit['_id']
+                source = hit['_source']
+                if 'brand' in source \
+                    and source['brand'] is not None \
+                        and source['brand']:
+                    data['brand'] = ''.join(source['brand'])
+                if 'coupe' in source \
+                    and source['coupe'] is not None \
+                        and source['coupe']:
+                    data['coupe'] = ''.join(source['coupe'])
+                if 'model' in source \
+                    and source['model'] is not None \
+                        and source['model']:
+                    data['model'] = ''.join(source['model'])
+                if 'generation' in source \
+                    and source['generation'] is not None \
+                        and source['generation']:
+                    data['generation'] = ''.join(source['generation'])
+                if 'engine' in source \
+                    and source['engine'] is not None \
+                        and source['engine']:
+                    data['engine'] = ''.join(source['engine'])
+                if 'productionyears' in source \
+                    and source['productionyears'] is not None \
+                        and source['productionyears']:
+                    data['productionyears'] = ''.join(source['productionyears'])
+                if 'generationyears' in source \
+                    and source['generationyears'] is not None \
+                        and source['generationyears']:
+                    data['generationyears'] = ''.join(source['generationyears'])
+
+                _list.append(data)
 
         response['results'] = _list
         logger.debug("total time spent - at: %s, value: %s",

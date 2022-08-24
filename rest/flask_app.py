@@ -824,31 +824,31 @@ class ReIndex(Resource):
 
                                                                 if 'brand' in modification:
                                                                     data['brand'] = ''.join(
-                                                                        modification['brand'])
+                                                                        modification['brand']).replace('T-modell', 'Saloon')
                                                                     combined = combined + \
                                                                         data['brand'] + \
                                                                         space
                                                                 if 'coupe' in modification:
                                                                     data['coupe'] = ''.join(
-                                                                        modification['coupe'])
+                                                                        modification['coupe']).replace('T-modell', 'Saloon')
                                                                     combined = combined + \
                                                                         data['coupe'] + \
                                                                         space
                                                                 if 'model' in modification:
                                                                     data['model'] = ''.join(
-                                                                        modification['model'])
+                                                                        modification['model']).replace('T-modell', 'Saloon')
                                                                     combined = combined + \
                                                                         data['model'] + \
                                                                         space
                                                                 if 'generation' in modification:
                                                                     data['generation'] = ''.join(
-                                                                        modification['generation'])
+                                                                        modification['generation']).replace('T-modell', 'Saloon')
                                                                     combined = combined + \
                                                                         data['generation'] + \
                                                                         space
                                                                 if 'engine' in modification:
                                                                     data['engine'] = ''.join(
-                                                                        modification['engine'])
+                                                                        modification['engine']).replace('T-modell', 'Saloon')
                                                                     combined = combined + \
                                                                         data['engine'] + \
                                                                         space

@@ -347,9 +347,18 @@ class GetSearchResult(Resource):
 
                 _list.append(data)
 
-        response['results'] = _list
         logger.debug("total time spent - at: %s, value: %s",
                      now, (time.time() - start_time))
+                     
+        if _list is not None and len(_list) > 0:
+            response['results'] = _list
+        else:
+            return {
+                'code': 200,
+                'message': 'No cars matching your search'
+            }
+        
+
         return response
 
 

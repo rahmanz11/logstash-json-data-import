@@ -1,7 +1,6 @@
 from datetime import datetime
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from textwrap import indent
 from api.elastic_test import connect_elasticsearch
 from flask import request, Flask, Blueprint
 from flask_restx import Api, Resource
@@ -55,6 +54,8 @@ class GetSearchResult(Resource):
     @auth.login_required
     def post(self):
         
+        size = 100
+        max_determinized_states = 10000000
         start_time = time.time()
         now = datetime.now()
         response = {
@@ -88,7 +89,7 @@ class GetSearchResult(Resource):
 
         case_insensitive = True
         query_body = {
-            "size": 10000000,
+            "size": size,
             "query": {
                 "bool": {
                     "minimum_should_match": 1,
@@ -99,7 +100,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -110,7 +111,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -121,7 +122,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -132,7 +133,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -143,7 +144,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -210,14 +211,14 @@ class GetSearchResult(Resource):
             case_insensitive = True
 
             combined_query_body = {
-                "size": 10000000,
+                "size": size,
                 "query": {
                     "regexp": {
                         "combined.keyword": {
                             "value": value,
                             "flags": "ALL",
                             "case_insensitive": case_insensitive,
-                            "max_determinized_states": 10000,
+                            "max_determinized_states": max_determinized_states,
                             "rewrite": "constant_score"
                         }
                     }
@@ -260,7 +261,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -271,7 +272,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -366,6 +367,8 @@ class GetSearchResult(Resource):
 class GetSearchResult(Resource):
     @auth.login_required
     def post(self):
+
+        max_determinized_states = 10000000
         start_time = time.time()
         now = datetime.now()
         keyword = request.json['keyword'].strip()
@@ -379,7 +382,7 @@ class GetSearchResult(Resource):
         case_insensitive = True
 
         query_body = {
-            "size": 10000000,
+            "size": 10,
             "query": {
                 "bool": {
                     "minimum_should_match": 1,
@@ -390,7 +393,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -401,7 +404,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -412,7 +415,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -423,7 +426,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -434,7 +437,7 @@ class GetSearchResult(Resource):
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
-                                    "max_determinized_states": 10000,
+                                    "max_determinized_states": max_determinized_states,
                                     "rewrite": "constant_score"
                                 }
                             }
@@ -480,7 +483,7 @@ class GetSearchResult(Resource):
                                 "value": value,
                                 "flags": "ALL",
                                 "case_insensitive": case_insensitive,
-                                "max_determinized_states": 10000,
+                                "max_determinized_states": max_determinized_states,
                                 "rewrite": "constant_score"
                             }
                         }
@@ -491,7 +494,7 @@ class GetSearchResult(Resource):
                                 "value": value,
                                 "flags": "ALL",
                                 "case_insensitive": case_insensitive,
-                                "max_determinized_states": 10000,
+                                "max_determinized_states": max_determinized_states,
                                 "rewrite": "constant_score"
                             }
                         }
@@ -590,7 +593,7 @@ class GetSearchResultDetail(Resource):
 
         false = False
         query_body = {
-            "size": 100000,
+            "size": 10,
             "query": {
                 "constant_score": {
                     "filter": {

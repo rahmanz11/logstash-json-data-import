@@ -10,10 +10,28 @@ from elasticsearch import helpers, RequestError
 import re
 import time
 from flask_cors import CORS
-
+from flask_restx import fields
 
 app = Flask(__name__)
-api = Api(app)
+
+authorizations = {
+    "Authorization": {
+        "type": "basic",
+        "in": "header",
+        "name": "Authorization",
+    }
+}
+
+api = Api(
+    app,
+    title="Search API",
+    version="1.0",
+    authorizations=authorizations,
+    security="Authorization",
+)
+
+# api = Api(app)
+
 auth = HTTPBasicAuth()
 
 CORS(app, resources={r"/car/*": {"origins": "*"}})
@@ -39,6 +57,8 @@ def authenticate(username, password):
     if username and password:
         if username == 'm2u' and password == 'Z$KF@S#SmU':
             return True
+        elif username == 'X032' and password == 'DKU!7X@nPY':
+            return True
     return False
 
 
@@ -46,13 +66,33 @@ def authenticate(username, password):
 def auth_error():
     return {
         'code': 401,
-        'message': 'Please provide auth credential'
+        'message': 'Please provide valid auth credential'
     }
 
+
+search_request = api.model('Search Request', {
+    'keyword': fields.String(readOnly=True, description='The search keyword', required=True)
+})
+
+response_body = api.model('Response Body', {
+    'generationyears': fields.String(description='Generation years'),
+    'brand': fields.String(description='Car brand'),
+    'coupe': fields.String(description='Coupe'),
+    'model': fields.String(description='Car model'),
+    'engine': fields.String(description='Car engine'),
+    'generation': fields.String(description='Car generation'),
+    'productionyears': fields.String(description='Production years')
+})
+
+search_response = api.model('Search Response', {
+    'results': fields.Nested(response_body)
+})
 
 @ns.route('/search')
 class GetSearchResult(Resource):
     @auth.login_required
+    @api.marshal_with(search_response)
+    @api.expect(search_request)
     def post(self):
         
         max_determinized_states = 10000000
@@ -312,6 +352,7 @@ class GetSearchResult(Resource):
                     'brand': None,
                     'coupe': None,
                     'model': None,
+                    'engine': None,
                     'generation': None,
                     'productionyears': None
                 }
@@ -362,7 +403,7 @@ class GetSearchResult(Resource):
         return response
 
 
-@ns.route('/search_')
+# @ns.route('/search_')
 class GetSearchResult(Resource):
     @auth.login_required
     def post(self):
@@ -582,7 +623,7 @@ class GetSearchResult(Resource):
         return response
 
 
-@ns.route('/search/detail')
+# @ns.route('/search/detail')
 class GetSearchResultDetail(Resource):
     @auth.login_required
     def post(self):
@@ -766,7 +807,7 @@ class GetSearchResultDetail(Resource):
         return response
 
 
-@ns.route('/reindex')
+# @ns.route('/reindex')
 class ReIndex(Resource):
     def post(self):
 
@@ -880,7 +921,6 @@ class ReIndex(Resource):
         if list is not None and len(list) > 0:
             helpers.bulk(es, list, index='car_search_data')
         return response
-
 
 blueprint = Blueprint('api', __name__)
 api.init_app(blueprint)

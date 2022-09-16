@@ -834,7 +834,7 @@ class ReIndex(Resource):
         }
         response = {}
         try:
-            res = es.search(index="car_information", body=query_body)
+            res = es.search(index="car_information", body=query_body, request_timeout=60)
         except Exception as e:
             logger.error(e)
             response['code'] = 500

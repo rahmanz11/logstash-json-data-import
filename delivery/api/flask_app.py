@@ -802,7 +802,7 @@ class GetSearchResultDetail(Resource):
         return response
 
 
-# @ns.route('/reindex')
+@ns.route('/reindex')
 class ReIndex(Resource):
     def post(self):
 
@@ -829,7 +829,7 @@ class ReIndex(Resource):
         }
         response = {}
         try:
-            res = es.search(index="car_information", body=query_body)
+            res = es.search(index="car_information_2", body=query_body)
         except Exception as e:
             logger.error(e)
             response['code'] = 500

@@ -130,238 +130,180 @@ class GetSearchResult(Resource):
         else:
             keyword = search_text
 
-        keyword = keyword.strip()
-        logger.debug("keyword - at: %s, value: %s", now, keyword)
-        logger.debug("co2 - at: %s, value: %s", now, co2)
-    
-        regex_letters = "[a-zA-Z0-9]+"
-        if re.search(regex_letters, keyword) is None or len(keyword) < 3:
-            return {
-                'code': 401,
-                'message': 'Please provide valid input of minimum 3 characters'
-            }
-        
-        regex_query = "[^a-zA-Z0-9$&+,:;=?@#|'<>.^*()%!]*"
-
-        letters = "".join(re.findall(regex_letters, keyword))
-
-        format = regex_query.join(letters)
-        value = ".*" + format + ".*"
-        logger.debug("search value - at: %s, value: %s", now, value)
-
-        case_insensitive = True
-        query_body = {
-            "size": size,
-            "query": {
-                "bool": {
-                    "minimum_should_match": 1,
-                    "should": [
-                        {
-                            "regexp": {
-                                "generation.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "brand.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "model.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "coupe.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "engine.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "match": {
-                                "productionyears": {
-                                    "query": value
-                                }
-                            }
-                        },
-                        {
-                            "match": {
-                                "generationyears": {
-                                    "query": value
-                                }
-                            }
-                        }
-                    ]
-                }
-            },
-            "sort": [
-                {
-                    "_score": {
-                        "order": "desc"
-                    }
-                }
-            ]
-        }
-
-        if co2 is not None:
-            query_body['query']['bool']['should'].append({
-                            "match": {
-                                "co2": {
-                                    "query": co2,
-                                    "operator": "and"
-                                }
-                            }
-                        })
-                        
-            query_body['query']['bool']['should'].append({
-                            "match": {
-                                "co2Min": {
-                                    "query": co2,
-                                    "operator": "and"
-                                }
-                            }
-                        })
-                        
-        logger.debug("search query: %s", query_body)       
         _list = []
-
-        try:
-            res = es.search(index="car_search_data", body=query_body)
-        except RequestError as e:
-            logger.error(e.info['error']['caused_by']['caused_by']['reason'])
-            response['code'] = 500
-            response['message'] = 'Error occurred while querying'
-            return response
-
+        index_name = "car_search_data"
         
-        hits = res['hits']['hits']
-        
-        if hits is None or len(hits) <= 0:
-            value = ''
-            if ' ' in keyword:
-                arr = keyword.split()
-                if arr is not None and len(arr) > 0:
-                    for str in arr:
-                        letters = "".join(re.findall(regex_letters, str))
-                        format = regex_query.join(letters)
-                        if not value:
-                            value = value + ".*" + format + ".*"
-                        else:
-                            value = value + format + ".*"
-            else:
-                letters = "".join(re.findall(regex_letters, keyword))
-                format = regex_query.join(letters)
-                value = ".*" + format + ".*"
+        if keyword is None or keyword.strip() == "":
+            query_body = {
+                "size": size,
+                "query": {
+                    "bool": {
+                        "minimum_should_match": 1,
+                        "should": [
+                            {
+                                "match": {
+                                    "co2": {
+                                        "query": co2
+                                    }
+                                }
+                            },
+                            {
+                                "match": {
+                                    "co2Min": {
+                                        "query": co2
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "sort": [
+                    {
+                        "_score": {
+                            "order": "desc"
+                        }
+                    }
+                ]
+            }
+            logger.debug("co2-search, query : %s", query_body)
+            try:
+                res = es.search(index=index_name, body=query_body)
+            except RequestError as e:
+                logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                response['code'] = 500
+                response['message'] = 'Error occurred while querying'
+                return response
 
+            hits = res['hits']['hits']
+        else:
+            keyword = keyword.strip()
+            logger.debug("keyword - at: %s, value: %s", now, keyword)
+            logger.debug("co2 - at: %s, value: %s", now, co2)
+        
+            regex_letters = "[a-zA-Z0-9]+"
+            if re.search(regex_letters, keyword) is None or len(keyword) < 3:
+                return {
+                    'code': 401,
+                    'message': 'Please provide valid input of minimum 3 characters'
+                }
+            
+            regex_query = "[^a-zA-Z0-9$&+,:;=?@#|'<>.^*()%!]*"
+
+            letters = "".join(re.findall(regex_letters, keyword))
+
+            format = regex_query.join(letters)
+            value = ".*" + format + ".*"
             logger.debug("search value - at: %s, value: %s", now, value)
 
             case_insensitive = True
-            if co2 is not None:
-                combined_query_body = {
-                            "size": size,
-                            "query": {
-                                "bool": {
-                                    "minimum_should_match": 1,
-                                    "should": [
-                                        {
-                                            "regexp": {
-                                                "combined.keyword": {
-                                                    "value": value,
-                                                    "flags": "ALL",
-                                                    "case_insensitive": case_insensitive,
-                                                    "max_determinized_states": max_determinized_states,
-                                                    "rewrite": "constant_score"
-                                                }
-                                            } 
-                                        },
-                                        {
-                                            "match": {
-                                                "co2": {
-                                                    "query": co2,
-                                                    "operator": "and"
-                                                }
-                                            }
-                                        },
-                                        {
-                                            "match": {
-                                                "co2Min": {
-                                                    "query": co2,
-                                                    "operator": "and"
-                                                }
-                                            }
-                                        }
-                                    ]
-                                }
-                            },
-                            "sort": [
-                                {
-                                    "_score": {
-                                        "order": "desc"
+            query_body = {
+                "size": size,
+                "query": {
+                    "bool": {
+                        "minimum_should_match": 1,
+                        "should": [
+                            {
+                                "regexp": {
+                                    "generation.keyword": {
+                                        "value": value,
+                                        "flags": "ALL",
+                                        "case_insensitive": case_insensitive,
+                                        "max_determinized_states": max_determinized_states,
+                                        "rewrite": "constant_score"
                                     }
                                 }
-                            ]
-                        }
-            else:
-                combined_query_body = {
-                    "size": size,
-                    "query": {
-                        "regexp": {
-                            "combined.keyword": {
-                                "value": value,
-                                "flags": "ALL",
-                                "case_insensitive": case_insensitive,
-                                "max_determinized_states": max_determinized_states,
-                                "rewrite": "constant_score"
+                            },
+                            {
+                                "regexp": {
+                                    "brand.keyword": {
+                                        "value": value,
+                                        "flags": "ALL",
+                                        "case_insensitive": case_insensitive,
+                                        "max_determinized_states": max_determinized_states,
+                                        "rewrite": "constant_score"
+                                    }
+                                }
+                            },
+                            {
+                                "regexp": {
+                                    "model.keyword": {
+                                        "value": value,
+                                        "flags": "ALL",
+                                        "case_insensitive": case_insensitive,
+                                        "max_determinized_states": max_determinized_states,
+                                        "rewrite": "constant_score"
+                                    }
+                                }
+                            },
+                            {
+                                "regexp": {
+                                    "coupe.keyword": {
+                                        "value": value,
+                                        "flags": "ALL",
+                                        "case_insensitive": case_insensitive,
+                                        "max_determinized_states": max_determinized_states,
+                                        "rewrite": "constant_score"
+                                    }
+                                }
+                            },
+                            {
+                                "regexp": {
+                                    "engine.keyword": {
+                                        "value": value,
+                                        "flags": "ALL",
+                                        "case_insensitive": case_insensitive,
+                                        "max_determinized_states": max_determinized_states,
+                                        "rewrite": "constant_score"
+                                    }
+                                }
+                            },
+                            {
+                                "match": {
+                                    "productionyears": {
+                                        "query": value
+                                    }
+                                }
+                            },
+                            {
+                                "match": {
+                                    "generationyears": {
+                                        "query": value
+                                    }
+                                }
                             }
+                        ]
+                    }
+                },
+                "sort": [
+                    {
+                        "_score": {
+                            "order": "desc"
                         }
-                    },
-                    "sort": [
-                        {
-                            "_score": {
-                                "order": "desc"
-                            }
-                        }
-                    ]
-                }
+                    }
+                ]
+            }
 
-            logger.debug("re-search, query : %s", combined_query_body)
+            if co2 is not None:
+                query_body['query']['bool']['should'].append({
+                                "match": {
+                                    "co2": {
+                                        "query": co2
+                                    }
+                                }
+                            })
+                            
+                query_body['query']['bool']['should'].append({
+                                "match": {
+                                    "co2Min": {
+                                        "query": co2
+                                    }
+                                }
+                            })
+                            
+            logger.debug("search query: %s", query_body)
 
             try:
-                res = es.search(index="car_search_data", body=combined_query_body)
+                res = es.search(index=index_name, body=query_body)
             except RequestError as e:
                 logger.error(e.info['error']['caused_by']['caused_by']['reason'])
                 response['code'] = 500
@@ -370,20 +312,76 @@ class GetSearchResult(Resource):
 
             
             hits = res['hits']['hits']
+            
+            if hits is None or len(hits) <= 0:
+                value = ''
+                if ' ' in keyword:
+                    arr = keyword.split()
+                    if arr is not None and len(arr) > 0:
+                        for str in arr:
+                            letters = "".join(re.findall(regex_letters, str))
+                            format = regex_query.join(letters)
+                            if not value:
+                                value = value + ".*" + format + ".*"
+                            else:
+                                value = value + format + ".*"
+                else:
+                    letters = "".join(re.findall(regex_letters, keyword))
+                    format = regex_query.join(letters)
+                    value = ".*" + format + ".*"
 
-        if hits is None or len(hits) <= 0:
-            if ' ' in keyword:
-                arr = keyword.split()
-                if arr is not None and len(arr) > 0:
-                    query_body['query']['bool']['filter'] = []
-                    script_str = ''
-                    for str in arr:
-                        letters = "".join(re.findall(regex_letters, str))
-                        format = regex_query.join(letters)
-                        value = ".*" + format + ".*"
-                        query_body['query']['bool']['should'].append({
+                logger.debug("search value - at: %s, value: %s", now, value)
+
+                case_insensitive = True
+                if co2 is not None:
+                    combined_query_body = {
+                                "size": size,
+                                "query": {
+                                    "bool": {
+                                        "minimum_should_match": 1,
+                                        "should": [
+                                            {
+                                                "regexp": {
+                                                    "combined.keyword": {
+                                                        "value": value,
+                                                        "flags": "ALL",
+                                                        "case_insensitive": case_insensitive,
+                                                        "max_determinized_states": max_determinized_states,
+                                                        "rewrite": "constant_score"
+                                                    }
+                                                } 
+                                            },
+                                            {
+                                                "match": {
+                                                    "co2": {
+                                                        "query": co2
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "match": {
+                                                    "co2Min": {
+                                                        "query": co2
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                },
+                                "sort": [
+                                    {
+                                        "_score": {
+                                            "order": "desc"
+                                        }
+                                    }
+                                ]
+                            }
+                else:
+                    combined_query_body = {
+                        "size": size,
+                        "query": {
                             "regexp": {
-                                "generation.keyword": {
+                                "combined.keyword": {
                                     "value": value,
                                     "flags": "ALL",
                                     "case_insensitive": case_insensitive,
@@ -391,66 +389,107 @@ class GetSearchResult(Resource):
                                     "rewrite": "constant_score"
                                 }
                             }
-                        })
-                        query_body['query']['bool']['should'].append({
-                            "regexp": {
-                                "engine.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
+                        },
+                        "sort": [
+                            {
+                                "_score": {
+                                    "order": "desc"
                                 }
                             }
-                        })
+                        ]
+                    }
 
-                        if co2 is not None:
-                            query_body['query']['bool']['should'].append({
-                                            "match": {
-                                                "co2": {
-                                                    "query": co2,
-                                                    "operator": "and"
-                                                }
-                                            }
-                                        })
-                                        
-                            query_body['query']['bool']['should'].append({
-                                            "match": {
-                                                "co2Min": {
-                                                    "query": co2,
-                                                    "operator": "and"
-                                                }
-                                            }
-                                        })
-                                        
-                        if script_str:
-                            script_str = script_str + ' && '
-                        script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'                    
-                    
-                    _condition_body = ' if (' + script_str + ') { return true } '
-                    
-                    query_body['query']['bool']['filter'].append(
-                        {
-                        "script": {
-                            "script": {
-                            "source": _condition_body,
-                            "lang": "painless"
-                            }
-                        }
-                        }
-                    )   
+                logger.debug("re-search, query : %s", combined_query_body)
 
-                logger.debug("re-re-search, query : %s", query_body)
                 try:
-                    res = es.search(index="car_search_data", body=query_body)
+                    res = es.search(index=index_name, body=combined_query_body)
                 except RequestError as e:
                     logger.error(e.info['error']['caused_by']['caused_by']['reason'])
                     response['code'] = 500
                     response['message'] = 'Error occurred while querying'
                     return response
 
+                
                 hits = res['hits']['hits']
-        
+
+            if hits is None or len(hits) <= 0:
+                if ' ' in keyword:
+                    arr = keyword.split()
+                    if arr is not None and len(arr) > 0:
+                        query_body['query']['bool']['filter'] = []
+                        script_str = ''
+                        for str in arr:
+                            letters = "".join(re.findall(regex_letters, str))
+                            format = regex_query.join(letters)
+                            value = ".*" + format + ".*"
+                            query_body['query']['bool']['should'].append({
+                                "regexp": {
+                                    "generation.keyword": {
+                                        "value": value,
+                                        "flags": "ALL",
+                                        "case_insensitive": case_insensitive,
+                                        "max_determinized_states": max_determinized_states,
+                                        "rewrite": "constant_score"
+                                    }
+                                }
+                            })
+                            query_body['query']['bool']['should'].append({
+                                "regexp": {
+                                    "engine.keyword": {
+                                        "value": value,
+                                        "flags": "ALL",
+                                        "case_insensitive": case_insensitive,
+                                        "max_determinized_states": max_determinized_states,
+                                        "rewrite": "constant_score"
+                                    }
+                                }
+                            })
+
+                            if co2 is not None:
+                                query_body['query']['bool']['should'].append({
+                                                "match": {
+                                                    "co2": {
+                                                        "query": co2
+                                                    }
+                                                }
+                                            })
+                                            
+                                query_body['query']['bool']['should'].append({
+                                                "match": {
+                                                    "co2Min": {
+                                                        "query": co2
+                                                    }
+                                                }
+                                            })
+                                            
+                            if script_str:
+                                script_str = script_str + ' && '
+                            script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'                    
+                        
+                        _condition_body = ' if (' + script_str + ') { return true } '
+                        
+                        query_body['query']['bool']['filter'].append(
+                            {
+                            "script": {
+                                "script": {
+                                "source": _condition_body,
+                                "lang": "painless"
+                                }
+                            }
+                            }
+                        )   
+
+                    logger.debug("re-re-search, query : %s", query_body)
+                    try:
+                        res = es.search(index=index_name, body=query_body)
+                    except RequestError as e:
+                        logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                        response['code'] = 500
+                        response['message'] = 'Error occurred while querying'
+                        return response
+
+                    hits = res['hits']['hits']
+            
         if hits and len(hits) > 0:
             for hit in hits:
                 data = {

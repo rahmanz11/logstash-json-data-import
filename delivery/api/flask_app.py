@@ -98,7 +98,7 @@ class GetSearchResult(Resource):
     @api.expect(search_request)
     def post(self):
         
-        size = 100
+        size = 50000
         max_determinized_states = 10000000
         start_time = time.time()
         now = datetime.now()
@@ -277,21 +277,19 @@ class GetSearchResult(Resource):
             }
 
             if co2 is not None:
-                query_body['query']['bool']['should'].append({
-                                "match": {
-                                    "co2": {
-                                        "query": co2
-                                    }
-                                }
-                            })
-                            
-                query_body['query']['bool']['should'].append({
-                                "match": {
-                                    "co2Min": {
-                                        "query": co2
-                                    }
-                                }
-                            })
+                script_str = '(doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + co2 + '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '")'                   
+                _condition_body = ' if (doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) { if (' + script_str + ') { return true } } '
+                query_body['query']['bool']['filter'] = []
+                query_body['query']['bool']['filter'].append(
+                    {
+                    "script": {
+                        "script": {
+                        "source": _condition_body,
+                        "lang": "painless"
+                        }
+                    }
+                    }
+                )
                             
             logger.debug("search query: %s", query_body)
 
@@ -343,20 +341,6 @@ class GetSearchResult(Resource):
                                                         "rewrite": "constant_score"
                                                     }
                                                 } 
-                                            },
-                                            {
-                                                "match": {
-                                                    "co2": {
-                                                        "query": co2
-                                                    }
-                                                }
-                                            },
-                                            {
-                                                "match": {
-                                                    "co2Min": {
-                                                        "query": co2
-                                                    }
-                                                }
                                             }
                                         ]
                                     }
@@ -369,6 +353,19 @@ class GetSearchResult(Resource):
                                     }
                                 ]
                             }
+                    script_str = '(doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + co2 + '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '")'                   
+                    _condition_body = ' if (doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) { if (' + script_str + ') { return true } } '
+                    combined_query_body['query']['bool']['filter'] = []
+                    combined_query_body['query']['bool']['filter'].append(
+                        {
+                        "script": {
+                            "script": {
+                            "source": _condition_body,
+                            "lang": "painless"
+                            }
+                        }
+                        }
+                    )
                 else:
                     combined_query_body = {
                         "size": size,
@@ -437,29 +434,15 @@ class GetSearchResult(Resource):
                                     }
                                 }
                             })
-
-                            if co2 is not None:
-                                query_body['query']['bool']['should'].append({
-                                                "match": {
-                                                    "co2": {
-                                                        "query": co2
-                                                    }
-                                                }
-                                            })
-                                            
-                                query_body['query']['bool']['should'].append({
-                                                "match": {
-                                                    "co2Min": {
-                                                        "query": co2
-                                                    }
-                                                }
-                                            })
                                             
                             if script_str:
                                 script_str = script_str + ' && '
                             script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'                    
                         
-                        _condition_body = ' if (' + script_str + ') { return true } '
+                        if co2 is not None:
+                            co2_script_str = '(doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) && ((doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + co2 + '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '"))'                   
+                            script_str = script_str + ' && ' + co2_script_str
+                            _condition_body = ' if (' + script_str + ') { return true } '
                         
                         query_body['query']['bool']['filter'].append(
                             {

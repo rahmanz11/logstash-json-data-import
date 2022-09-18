@@ -82,6 +82,15 @@ search_response = api.model('Search Response', {
     'results': fields.Nested(response_body)
 })
 
+def has_numbers_in_3rd_brackets(s):
+    return bool(re.search(r'\[\[\d+\]\]', s))
+
+def get_values(s):
+    m = re.search(r"\[\[(\w+)\]\]", s)
+    co2 = m.group(1)
+    keyword = s.split("[[")
+    return keyword[0], co2
+
 @ns.route('/search')
 class GetSearchResult(Resource):
     @auth.login_required
@@ -98,22 +107,33 @@ class GetSearchResult(Resource):
         }
 
         value = ''
-        keyword = request.json['keyword'].strip()
-        logger.debug("keyword - at: %s, value: %s", now, keyword)
+        search_text = request.json['keyword'].strip()
+        logger.debug("search_text - at: %s, value: %s", now, search_text)
         
-        if not keyword:
+        if not search_text:
             return {
                 'code': 401,
                 'message': 'Please provide input'
             }
 
+        keyword = None
+        co2 = None
+        if has_numbers_in_3rd_brackets(search_text):
+            keyword, co2 = get_values(search_text)
+        else:
+            keyword = search_text
+
+        keyword = keyword.strip()
+        logger.debug("keyword - at: %s, value: %s", now, keyword)
+        logger.debug("co2 - at: %s, value: %s", now, co2)
+    
         regex_letters = "[a-zA-Z0-9]+"
         if re.search(regex_letters, keyword) is None or len(keyword) < 3:
             return {
                 'code': 401,
                 'message': 'Please provide valid input of minimum 3 characters'
             }
-
+        
         regex_query = "[^a-zA-Z0-9$&+,:;=?@#|'<>.^*()%!]*"
 
         letters = "".join(re.findall(regex_letters, keyword))
@@ -210,6 +230,25 @@ class GetSearchResult(Resource):
             ]
         }
 
+        if co2 is not None:
+            query_body['query']['bool']['should'].append({
+                            "match": {
+                                "co2": {
+                                    "query": co2,
+                                    "operator": "and"
+                                }
+                            }
+                        })
+                        
+            query_body['query']['bool']['should'].append({
+                            "match": {
+                                "co2Min": {
+                                    "query": co2,
+                                    "operator": "and"
+                                }
+                            }
+                        })
+                        
         logger.debug("search query: %s", query_body)       
         _list = []
 
@@ -244,28 +283,73 @@ class GetSearchResult(Resource):
             logger.debug("search value - at: %s, value: %s", now, value)
 
             case_insensitive = True
-
-            combined_query_body = {
-                "size": size,
-                "query": {
-                    "regexp": {
-                        "combined.keyword": {
-                            "value": value,
-                            "flags": "ALL",
-                            "case_insensitive": case_insensitive,
-                            "max_determinized_states": max_determinized_states,
-                            "rewrite": "constant_score"
+            if co2 is not None:
+                combined_query_body = {
+                            "size": size,
+                            "query": {
+                                "bool": {
+                                    "minimum_should_match": 1,
+                                    "should": [
+                                        {
+                                            "regexp": {
+                                                "combined.keyword": {
+                                                    "value": value,
+                                                    "flags": "ALL",
+                                                    "case_insensitive": case_insensitive,
+                                                    "max_determinized_states": max_determinized_states,
+                                                    "rewrite": "constant_score"
+                                                }
+                                            } 
+                                        },
+                                        {
+                                            "match": {
+                                                "co2": {
+                                                    "query": co2,
+                                                    "operator": "and"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "match": {
+                                                "co2Min": {
+                                                    "query": co2,
+                                                    "operator": "and"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "sort": [
+                                {
+                                    "_score": {
+                                        "order": "desc"
+                                    }
+                                }
+                            ]
                         }
-                    }
-                },
-                "sort": [
-                    {
-                        "_score": {
-                            "order": "desc"
+            else:
+                combined_query_body = {
+                    "size": size,
+                    "query": {
+                        "regexp": {
+                            "combined.keyword": {
+                                "value": value,
+                                "flags": "ALL",
+                                "case_insensitive": case_insensitive,
+                                "max_determinized_states": max_determinized_states,
+                                "rewrite": "constant_score"
+                            }
                         }
-                    }
-                ]
-            }
+                    },
+                    "sort": [
+                        {
+                            "_score": {
+                                "order": "desc"
+                            }
+                        }
+                    ]
+                }
 
             logger.debug("re-search, query : %s", combined_query_body)
 
@@ -312,6 +396,26 @@ class GetSearchResult(Resource):
                                 }
                             }
                         })
+
+                        if co2 is not None:
+                            query_body['query']['bool']['should'].append({
+                                            "match": {
+                                                "co2": {
+                                                    "query": co2,
+                                                    "operator": "and"
+                                                }
+                                            }
+                                        })
+                                        
+                            query_body['query']['bool']['should'].append({
+                                            "match": {
+                                                "co2Min": {
+                                                    "query": co2,
+                                                    "operator": "and"
+                                                }
+                                            }
+                                        })
+                                        
                         if script_str:
                             script_str = script_str + ' && '
                         script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'                    
@@ -347,6 +451,7 @@ class GetSearchResult(Resource):
                     'brand': None,
                     'coupe': None,
                     'model': None,
+                    'engine': None,
                     'generation': None,
                     'productionyears': None
                 }
@@ -393,10 +498,8 @@ class GetSearchResult(Resource):
                 'code': 200,
                 'message': 'No cars matching your search'
             }
-        
 
         return response
-
 
 # @ns.route('/search_')
 class GetSearchResult(Resource):
@@ -822,6 +925,8 @@ class ReIndex(Resource):
                 "models.model.generations.generation.modifications.modification.model",
                 "models.model.generations.generation.modifications.modification.coupe",
                 "models.model.generations.generation.modifications.modification.engine",
+                "models.model.generations.generation.modifications.modification.co2",
+                "models.model.generations.generation.modifications.modification.co2Min",
                 "models.model.generations.generation.modifications.modification.productionyears",
                 "models.model.generations.generation.generationyears"
             ],
@@ -862,6 +967,8 @@ class ReIndex(Resource):
                                                                     'brand': None,
                                                                     'coupe': None,
                                                                     'model': None,
+                                                                    'co2': None,
+                                                                    'co2Min': None,
                                                                     'generation': None,
                                                                     'productionyears': None,
                                                                     'combined': None
@@ -887,6 +994,12 @@ class ReIndex(Resource):
                                                                     combined = combined + \
                                                                         data['model'] + \
                                                                         space
+                                                                if 'co2' in modification:
+                                                                    data['co2'] = ''.join(
+                                                                        modification['co2'])
+                                                                if 'co2Min' in modification:
+                                                                    data['co2Min'] = ''.join(
+                                                                        modification['co2Min'])
                                                                 if 'generation' in modification:
                                                                     data['generation'] = ''.join(
                                                                         modification['generation']).replace('T-modell', 'Saloon')

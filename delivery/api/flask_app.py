@@ -992,6 +992,7 @@ class ReIndex(Resource):
                                                                     'co2': None,
                                                                     'co2Min': None,
                                                                     'generation': None,
+                                                                    'engine': None,
                                                                     'productionyears': None,
                                                                     'combined': None
                                                                 }
@@ -1050,6 +1051,133 @@ class ReIndex(Resource):
                                                                     data)
         if list is not None and len(list) > 0:
             helpers.bulk(es, list, index='car_search_data')
+        return response
+
+
+@ns.route('/reindex3')
+class ReIndex(Resource):
+    def post(self):
+
+        query_body = {
+            "size": 1000000,
+            "query": {
+                "constant_score": {
+                    "filter": {
+                        "match_all": {}
+                    },
+                    "boost": 1.2
+                }
+            },
+            "fields": [
+                "models.model.generations.generation.modifications.modification.generation",
+                "models.model.generations.generation.modifications.modification.brand",
+                "models.model.generations.generation.modifications.modification.model",
+                "models.model.generations.generation.modifications.modification.coupe",
+                "models.model.generations.generation.modifications.modification.engine",
+                "models.model.generations.generation.modifications.modification.co2",
+                "models.model.generations.generation.modifications.modification.co2Min",
+                "models.model.generations.generation.modifications.modification.maxspeed",
+                "models.model.generations.generation.modelYear"
+            ],
+            "_source": False
+        }
+        response = {}
+        try:
+            res = es.search(index="car_information_3", body=query_body)
+        except Exception as e:
+            logger.error(e)
+            response['code'] = 500
+            response['message'] = 'Error occurred while querying'
+            return response
+
+        hits = res['hits']['hits']
+        list = []
+        if hits is not None and len(hits) > 0:
+            for hit in hits:
+                if hit['fields'] is not None and hit['fields']['models'] is not None and len(hit['fields']['models']) > 0:
+                    for model in hit['fields']['models']:
+                        for mv in model.values():
+                            for imv in mv:
+                                for imvs in imv.values():
+                                    for gns in imvs:
+                                        for gnv in gns.values():
+                                            for gn in gnv:
+                                                modelYear = None
+                                                if 'modelYear' in gn:
+                                                    modelYear = ''.join(
+                                                        gn['modelYear'])
+
+                                                if 'modifications' in gn:
+                                                    for ms in gn['modifications']:
+                                                        for m in ms.values():
+                                                            for modification in m:
+                                                                data = {
+                                                                    'modelYear': None,
+                                                                    'brand': None,
+                                                                    'coupe': None,
+                                                                    'model': None,
+                                                                    'co2': None,
+                                                                    'co2Min': None,
+                                                                    'generation': None,
+                                                                    'maxspeed': None,
+                                                                    'engine': None,
+                                                                    'combined': None
+                                                                }
+                                                                space = ' '
+                                                                combined = ''
+
+                                                                if 'brand' in modification:
+                                                                    data['brand'] = ''.join(
+                                                                        modification['brand']).replace('T-modell', 'Saloon')
+                                                                    combined = combined + \
+                                                                        data['brand'] + \
+                                                                        space
+                                                                if 'coupe' in modification:
+                                                                    data['coupe'] = ''.join(
+                                                                        modification['coupe']).replace('T-modell', 'Saloon')
+                                                                    combined = combined + \
+                                                                        data['coupe'] + \
+                                                                        space
+                                                                if 'model' in modification:
+                                                                    data['model'] = ''.join(
+                                                                        modification['model']).replace('T-modell', 'Saloon')
+                                                                    combined = combined + \
+                                                                        data['model'] + \
+                                                                        space
+                                                                if 'co2' in modification:
+                                                                    data['co2'] = ''.join(
+                                                                        modification['co2'])
+                                                                if 'co2Min' in modification:
+                                                                    data['co2Min'] = ''.join(
+                                                                        modification['co2Min'])
+                                                                if 'generation' in modification:
+                                                                    data['generation'] = ''.join(
+                                                                        modification['generation']).replace('T-modell', 'Saloon')
+                                                                    combined = combined + \
+                                                                        data['generation'] + \
+                                                                        space
+                                                                if 'engine' in modification:
+                                                                    data['engine'] = ''.join(
+                                                                        modification['engine']).replace('T-modell', 'Saloon')
+                                                                    combined = combined + \
+                                                                        data['engine'] + \
+                                                                        space
+                                                                if 'maxspeed' in modification:
+                                                                    data['maxspeed'] = ''.join(
+                                                                        modification['maxspeed'])
+                                                                    combined = combined + \
+                                                                        data['maxspeed'] + space
+                                                                if modelYear:
+                                                                    data['modelYear'] = modelYear
+                                                                    combined = combined + \
+                                                                        data['modelYear']
+
+                                                                data['combined'] = combined
+
+                                                                list.append(
+                                                                    data)
+        if list is not None and len(list) > 0:
+            helpers.bulk(es, list, index='car_search_data_3')
         return response
 
 

@@ -243,6 +243,30 @@ PUT car_search_data
           }
         }
       },
+      "modelYear": {
+        "type": "text",
+        "analyzer": "standard",
+        "search_analyzer": "standard",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256,
+            "normalizer": "lower_case_normalizer"
+          }
+        }
+      },        
+      "maxspeed": {
+        "type": "text",
+        "analyzer": "standard",
+        "search_analyzer": "standard",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256,
+            "normalizer": "lower_case_normalizer"
+          }
+        }
+      },
       "combined": {
         "type": "text",
         "analyzer": "standard",

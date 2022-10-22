@@ -1,0 +1,291 @@
+{
+    "settings": {
+      "analysis": {
+        "analyzer": {
+          "autocomplete": {
+            "tokenizer": "autocomplete",
+            "filter": [
+              "lowercase"
+            ]
+          },
+          "tokenize_on_chars": {
+            "tokenizer": "tokenize_on_chars",
+            "filter": [
+              "lowercase"
+            ]
+          },
+          "autocomplete_search": {
+            "tokenizer": "autocomplete",
+            "filter": [
+              "lowercase"
+            ]
+          }
+        },
+        "tokenizer": {
+          "autocomplete": {
+            "type": "edge_ngram",
+            "min_gram": 2,
+            "max_gram": 10,
+            "token_chars": [
+              "letter",
+              "digit",
+              "whitespace",
+              "punctuation",
+              "custom"
+            ],
+            "custom_token_chars": "-"
+          },
+          "tokenize_on_chars": {
+            "type": "char_group",
+            "tokenize_on_chars": [
+              "whitespace",
+              "-",
+              "\n",
+              ","
+            ]
+          }
+        }
+      },
+      "max_result_window": 999999999
+    },
+    "mappings": {
+      "properties": {
+        "models": {
+          "type": "nested",
+          "properties": {
+            "model": {
+              "type": "nested",
+              "properties": {
+                "generations": {
+                  "type": "nested",
+                  "properties": {
+                    "generation": {
+                      "type": "nested",
+                      "properties": {
+                        "generationyears": {
+                          "type": "text",
+                          "analyzer": "tokenize_on_chars"
+                        },
+                        "modelYear": {
+                            "type": "text",
+                            "analyzer": "tokenize_on_chars"
+                        },
+                        "modifications": {
+                          "type": "nested",
+                          "properties": {
+                            "modification": {
+                              "type": "nested",
+                              "properties": {
+                                "brand": {
+                                  "type": "text",
+                                  "analyzer": "autocomplete",
+                                  "search_analyzer": "autocomplete_search"
+                                },
+                                "coupe": {
+                                  "type": "text",
+                                  "analyzer": "autocomplete",
+                                  "search_analyzer": "autocomplete_search"
+                                },
+                                "engine": {
+                                  "type": "text",
+                                  "analyzer": "autocomplete",
+                                  "search_analyzer": "autocomplete_search"
+                                },
+                                "generation": {
+                                  "type": "text",
+                                  "analyzer": "autocomplete",
+                                  "search_analyzer": "autocomplete_search"
+                                },
+                                "model": {
+                                  "type": "text",
+                                  "analyzer": "autocomplete",
+                                  "search_analyzer": "autocomplete_search"
+                                },
+                                "productionyears": {
+                                  "type": "text",
+                                  "analyzer": "tokenize_on_chars"
+                                },
+                                "maxspeed": {
+                                  "type": "text",
+                                  "analyzer": "tokenize_on_chars"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  {
+    "settings": {
+      "analysis": {
+        "normalizer": {
+          "lower_case_normalizer": {
+            "filter": [
+              "lowercase"
+            ],
+            "type": "custom"
+          }
+        }
+      },
+      "max_result_window": 999999999
+    },
+    "mappings": {
+      "properties": {
+        "brand": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "coupe": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "engine": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "generation": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "model": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "co2": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "co2Min": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "productionyears": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "generationyears": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "modelYear": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },        
+        "maxspeed": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "combined": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        }
+      }
+    }
+  }

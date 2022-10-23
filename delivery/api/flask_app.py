@@ -108,24 +108,30 @@ class GetSearchResult(Resource):
         }
 
         value = ''
-        search_text = request.json['keyword'].strip()
-        logger.debug("search_text - at: %s, value: %s", now, search_text)
+        search_text = None
+        if 'keyword' in request.json:
+            search_text = request.json['keyword'].strip()
+            logger.debug("search_text - at: %s, value: %s", now, search_text)
         
-        if not search_text:
+        if search_text is None or not search_text:
             return {
                 'code': 401,
                 'message': 'Please provide input'
             }
 
-        page = request.json['page']
-        if page is None:
-            page = 0
-        elif page > 0:
-            page = page - 1
-            
-        size = request.json['size']
-        if size is None:
-            size = 50
+        page = 0
+        if 'page' in request.json:
+            page = request.json['page']
+            if page is None:
+                page = 0
+            elif page > 0:
+                page = page - 1
+        
+        size = 50
+        if 'size' in request.json:
+            size = request.json['size']
+            if size is None or size < 0:
+                size = 50
         
         keyword = None
         co2 = None

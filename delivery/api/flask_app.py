@@ -65,7 +65,9 @@ def auth_error():
     }
 
 search_request = api.model('Search Request', {
-    'keyword': fields.String(readOnly=True, description='The search keyword', required=True)
+    'keyword': fields.String(readOnly=True, description='The search keyword', required=True),
+    'page': fields.Integer,
+    'size': fields.Integer
 })
 
 response_body = api.model('Response Body', {
@@ -98,7 +100,6 @@ class GetSearchResult(Resource):
     @api.expect(search_request)
     def post(self):
         
-        size = 50000
         max_determinized_states = 10000000
         start_time = time.time()
         now = datetime.now()
@@ -116,6 +117,16 @@ class GetSearchResult(Resource):
                 'message': 'Please provide input'
             }
 
+        page = request.json['page']
+        if page is None:
+            page = 0
+        elif page > 0:
+            page = page - 1
+            
+        size = request.json['size']
+        if size is None:
+            size = 50
+        
         keyword = None
         co2 = None
         if has_numbers_in_3rd_brackets(search_text):
@@ -128,6 +139,7 @@ class GetSearchResult(Resource):
         
         if keyword is None or keyword.strip() == "":
             query_body = {
+                "from": page,
                 "size": size,
                 "query": {
                     "bool": {
@@ -190,6 +202,7 @@ class GetSearchResult(Resource):
 
             case_insensitive = True
             query_body = {
+                "from": page,
                 "size": size,
                 "query": {
                     "bool": {
@@ -326,6 +339,7 @@ class GetSearchResult(Resource):
                 case_insensitive = True
                 if co2 is not None:
                     combined_query_body = {
+                                "from": page,
                                 "size": size,
                                 "query": {
                                     "bool": {
@@ -368,6 +382,7 @@ class GetSearchResult(Resource):
                     )
                 else:
                     combined_query_body = {
+                        "from": page,
                         "size": size,
                         "query": {
                             "regexp": {
@@ -1077,6 +1092,7 @@ class ReIndex(Resource):
                 "models.model.generations.generation.modifications.modification.co2",
                 "models.model.generations.generation.modifications.modification.co2Min",
                 "models.model.generations.generation.modifications.modification.maxspeed",
+                "models.model.generations.generation.modifications.modification.acceleration",
                 "models.model.generations.generation.modelYear"
             ],
             "_source": False
@@ -1121,6 +1137,7 @@ class ReIndex(Resource):
                                                                     'generation': None,
                                                                     'maxspeed': None,
                                                                     'engine': None,
+                                                                    'acceleration': None,
                                                                     'combined': None
                                                                 }
                                                                 space = ' '
@@ -1167,6 +1184,11 @@ class ReIndex(Resource):
                                                                         modification['maxspeed'])
                                                                     combined = combined + \
                                                                         data['maxspeed'] + space
+                                                                if 'acceleration' in modification:
+                                                                    data['acceleration'] = ''.join(
+                                                                        modification['acceleration'])
+                                                                    combined = combined + \
+                                                                        data['acceleration'] + space
                                                                 if modelYear:
                                                                     data['modelYear'] = modelYear
                                                                     combined = combined + \

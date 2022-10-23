@@ -108,6 +108,10 @@
                                 "maxspeed": {
                                   "type": "text",
                                   "analyzer": "tokenize_on_chars"
+                                },
+                                "acceleration": {
+                                  "type": "text",
+                                  "analyzer": "tokenize_on_chars"
                                 }
                               }
                             }
@@ -263,6 +267,18 @@
           }
         },        
         "maxspeed": {
+          "type": "text",
+          "analyzer": "standard",
+          "search_analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256,
+              "normalizer": "lower_case_normalizer"
+            }
+          }
+        },
+        "acceleration": {
           "type": "text",
           "analyzer": "standard",
           "search_analyzer": "standard",

@@ -282,6 +282,27 @@ class GetSearchResult(Resource):
                                         "query": value
                                     }
                                 }
+                            },
+                            {
+                                "match": {
+                                    "engineDisplacement": {
+                                        "query": value
+                                    }
+                                }
+                            },
+                            {
+                                "match": {
+                                    "acceleration": {
+                                        "query": value
+                                    }
+                                }
+                            },
+                            {
+                                "match": {
+                                    "maxspeed": {
+                                        "query": value
+                                    }
+                                }
                             }
                         ]
                     }
@@ -1097,8 +1118,11 @@ class ReIndex(Resource):
                 "models.model.generations.generation.modifications.modification.engine",
                 "models.model.generations.generation.modifications.modification.co2",
                 "models.model.generations.generation.modifications.modification.co2Min",
+                "models.model.generations.generation.modifications.modification.productionyears",
+                "models.model.generations.generation.generationyears",
                 "models.model.generations.generation.modifications.modification.maxspeed",
                 "models.model.generations.generation.modifications.modification.acceleration",
+                "models.model.generations.generation.modifications.modification.engineDisplacement",
                 "models.model.generations.generation.modelYear"
             ],
             "_source": False
@@ -1124,17 +1148,16 @@ class ReIndex(Resource):
                                     for gns in imvs:
                                         for gnv in gns.values():
                                             for gn in gnv:
-                                                modelYear = None
-                                                if 'modelYear' in gn:
-                                                    modelYear = ''.join(
-                                                        gn['modelYear'])
-
+                                                generationyears = None
+                                                if 'generationyears' in gn:
+                                                    generationyears = ''.join(
+                                                        gn['generationyears'])
                                                 if 'modifications' in gn:
                                                     for ms in gn['modifications']:
                                                         for m in ms.values():
                                                             for modification in m:
                                                                 data = {
-                                                                    'modelYear': None,
+                                                                    'generationyears': None,
                                                                     'brand': None,
                                                                     'coupe': None,
                                                                     'model': None,
@@ -1144,6 +1167,8 @@ class ReIndex(Resource):
                                                                     'maxspeed': None,
                                                                     'engine': None,
                                                                     'acceleration': None,
+                                                                    'engineDisplacement': None,
+                                                                    'productionyears': None,
                                                                     'combined': None
                                                                 }
                                                                 space = ' '
@@ -1195,17 +1220,27 @@ class ReIndex(Resource):
                                                                         modification['acceleration'])
                                                                     combined = combined + \
                                                                         data['acceleration'] + space
-                                                                if modelYear:
-                                                                    data['modelYear'] = modelYear
+                                                                if 'engineDisplacement' in modification:
+                                                                    data['engineDisplacement'] = ''.join(
+                                                                        modification['engineDisplacement'])
                                                                     combined = combined + \
-                                                                        data['modelYear']
+                                                                        data['engineDisplacement'] + space
+                                                                if 'productionyears' in modification:
+                                                                    data['productionyears'] = ''.join(
+                                                                        modification['productionyears'])
+                                                                    combined = combined + \
+                                                                        data['productionyears'] + space
+                                                                if generationyears:
+                                                                    data['generationyears'] = generationyears
+                                                                    combined = combined + \
+                                                                        data['generationyears']
 
                                                                 data['combined'] = combined
 
                                                                 list.append(
                                                                     data)
         if list is not None and len(list) > 0:
-            helpers.bulk(es, list, index='car_search_data_3')
+            helpers.bulk(es, list, index='car_search_data')
         return response
 
 

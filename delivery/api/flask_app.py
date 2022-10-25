@@ -64,6 +64,7 @@ def auth_error():
         'message': 'Please provide valid auth credential'
     }
 
+
 search_request = api.model('Search Request', {
     'keyword': fields.String(readOnly=True, description='The search keyword', required=True),
     'page': fields.Integer,
@@ -84,8 +85,10 @@ search_response = api.model('Search Response', {
     'results': fields.Nested(response_body)
 })
 
+
 def has_numbers_in_3rd_brackets(s):
     return bool(re.search(r'\[\[\d+\]\]', s))
+
 
 def get_values(s):
     m = re.search(r"\[\[(\w+)\]\]", s)
@@ -93,13 +96,14 @@ def get_values(s):
     keyword = s.split("[[")
     return keyword[0], co2
 
+
 @ns.route('/search')
 class GetSearchResult(Resource):
     @auth.login_required
     @api.marshal_with(search_response)
     @api.expect(search_request)
     def post(self):
-        
+
         max_determinized_states = 10000000
         start_time = time.time()
         now = datetime.now()
@@ -112,7 +116,7 @@ class GetSearchResult(Resource):
         if 'keyword' in request.json:
             search_text = request.json['keyword'].strip()
             logger.debug("search_text - at: %s, value: %s", now, search_text)
-        
+
         if search_text is None or not search_text:
             return {
                 'code': 401,
@@ -126,13 +130,13 @@ class GetSearchResult(Resource):
                 page = 0
             elif page > 0:
                 page = page - 1
-        
+
         size = 50
         if 'size' in request.json:
             size = request.json['size']
             if size is None or size < 0:
                 size = 50
-        
+
         keyword = None
         co2 = None
         if has_numbers_in_3rd_brackets(search_text):
@@ -142,7 +146,7 @@ class GetSearchResult(Resource):
 
         _list = []
         index_name = "car_search_data"
-        
+
         if keyword is None or keyword.strip() == "":
             query_body = {
                 "from": page,
@@ -180,7 +184,8 @@ class GetSearchResult(Resource):
             try:
                 res = es.search(index=index_name, body=query_body)
             except RequestError as e:
-                logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                logger.error(e.info['error']['caused_by']
+                             ['caused_by']['reason'])
                 response['code'] = 500
                 response['message'] = 'Error occurred while querying'
                 return response
@@ -190,14 +195,14 @@ class GetSearchResult(Resource):
             keyword = keyword.strip()
             logger.debug("keyword - at: %s, value: %s", now, keyword)
             logger.debug("co2 - at: %s, value: %s", now, co2)
-        
+
             regex_letters = "[a-zA-Z0-9]+"
             if re.search(regex_letters, keyword) is None or len(keyword) < 3:
                 return {
                     'code': 401,
                     'message': 'Please provide valid input of minimum 3 characters'
                 }
-            
+
             regex_query = "[^a-zA-Z0-9$&+,:;=?@#|'<>.^*()%!]*"
 
             letters = "".join(re.findall(regex_letters, keyword))
@@ -284,23 +289,23 @@ class GetSearchResult(Resource):
                                 }
                             },
                             {
-                                "match": {
-                                    "engineDisplacement": {
-                                        "query": value
+                                "term": {
+                                    "engineDisplacement.keyword": {
+                                        "value": keyword
                                     }
                                 }
                             },
                             {
-                                "match": {
-                                    "acceleration": {
-                                        "query": value
+                                "term": {
+                                    "acceleration.keyword": {
+                                        "value": keyword
                                     }
                                 }
                             },
                             {
-                                "match": {
-                                    "maxspeed": {
-                                        "query": value
+                                "term": {
+                                    "maxspeed.keyword": {
+                                        "value": keyword
                                     }
                                 }
                             }
@@ -317,33 +322,36 @@ class GetSearchResult(Resource):
             }
 
             if co2 is not None:
-                script_str = '(doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + co2 + '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '")'                   
-                _condition_body = ' if (doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) { if (' + script_str + ') { return true } } '
+                script_str = '(doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + \
+                    co2 + \
+                    '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '")'
+                _condition_body = ' if (doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) { if (' + \
+                    script_str + ') { return true } } '
                 query_body['query']['bool']['filter'] = []
                 query_body['query']['bool']['filter'].append(
                     {
-                    "script": {
                         "script": {
-                        "source": _condition_body,
-                        "lang": "painless"
+                            "script": {
+                                "source": _condition_body,
+                                "lang": "painless"
+                            }
                         }
                     }
-                    }
                 )
-                            
+
             logger.debug("search query: %s", query_body)
 
             try:
                 res = es.search(index=index_name, body=query_body)
             except RequestError as e:
-                logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                logger.error(e.info['error']['caused_by']
+                             ['caused_by']['reason'])
                 response['code'] = 500
                 response['message'] = 'Error occurred while querying'
                 return response
 
-            
             hits = res['hits']['hits']
-            
+
             if hits is None or len(hits) <= 0:
                 value = ''
                 if ' ' in keyword:
@@ -366,45 +374,48 @@ class GetSearchResult(Resource):
                 case_insensitive = True
                 if co2 is not None:
                     combined_query_body = {
-                                "from": page,
-                                "size": size,
-                                "query": {
-                                    "bool": {
-                                        "minimum_should_match": 1,
-                                        "should": [
-                                            {
-                                                "regexp": {
-                                                    "combined.keyword": {
-                                                        "value": value,
-                                                        "flags": "ALL",
-                                                        "case_insensitive": case_insensitive,
-                                                        "max_determinized_states": max_determinized_states,
-                                                        "rewrite": "constant_score"
-                                                    }
-                                                } 
-                                            }
-                                        ]
-                                    }
-                                },
-                                "sort": [
+                        "from": page,
+                        "size": size,
+                        "query": {
+                            "bool": {
+                                "minimum_should_match": 1,
+                                "should": [
                                     {
-                                        "_score": {
-                                            "order": "desc"
+                                        "regexp": {
+                                            "combined.keyword": {
+                                                "value": value,
+                                                "flags": "ALL",
+                                                "case_insensitive": case_insensitive,
+                                                "max_determinized_states": max_determinized_states,
+                                                "rewrite": "constant_score"
+                                            }
                                         }
                                     }
                                 ]
                             }
-                    script_str = '(doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + co2 + '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '")'                   
-                    _condition_body = ' if (doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) { if (' + script_str + ') { return true } } '
+                        },
+                        "sort": [
+                            {
+                                "_score": {
+                                    "order": "desc"
+                                }
+                            }
+                        ]
+                    }
+                    script_str = '(doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + \
+                        co2 + \
+                        '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '")'
+                    _condition_body = ' if (doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) { if (' + \
+                        script_str + ') { return true } } '
                     combined_query_body['query']['bool']['filter'] = []
                     combined_query_body['query']['bool']['filter'].append(
                         {
-                        "script": {
                             "script": {
-                            "source": _condition_body,
-                            "lang": "painless"
+                                "script": {
+                                    "source": _condition_body,
+                                    "lang": "painless"
+                                }
                             }
-                        }
                         }
                     )
                 else:
@@ -436,12 +447,12 @@ class GetSearchResult(Resource):
                 try:
                     res = es.search(index=index_name, body=combined_query_body)
                 except RequestError as e:
-                    logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                    logger.error(e.info['error']['caused_by']
+                                 ['caused_by']['reason'])
                     response['code'] = 500
                     response['message'] = 'Error occurred while querying'
                     return response
 
-                
                 hits = res['hits']['hits']
 
             if hits is None or len(hits) <= 0:
@@ -476,38 +487,66 @@ class GetSearchResult(Resource):
                                     }
                                 }
                             })
-                                            
+                            query_body['query']['bool']['should'].append({
+                                "term": {
+                                    "engineDisplacement.keyword": {
+                                        "value": keyword                                        
+                                    }
+                                }
+                            })
+                            query_body['query']['bool']['should'].append({
+                                "term": {
+                                    "acceleration.keyword": {
+                                        "value": keyword                                        
+                                    }
+                                }
+                            })
+                            query_body['query']['bool']['should'].append({
+                                "term": {
+                                    "maxspeed.keyword": {
+                                        "value": keyword                                        
+                                    }
+                                }
+                            })
+
                             if script_str:
                                 script_str = script_str + ' && '
-                            script_str = script_str + '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + value + '/i.matcher(doc["engine.keyword"].value).matches())'                    
-                        
+                            script_str = script_str + \
+                                '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + \
+                                value + \
+                                '/i.matcher(doc["engine.keyword"].value).matches())'
+
                         if co2 is not None:
-                            co2_script_str = '(doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) && ((doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + co2 + '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '"))'                   
+                            co2_script_str = '(doc["co2Min.keyword"].size() != 0 || doc["co2.keyword"].size() != 0) && ((doc["co2Min.keyword"] != null && doc["co2Min.keyword"].value == "' + \
+                                co2 + \
+                                '") || (doc["co2.keyword"] != null && doc["co2.keyword"].value == "' + co2 + '"))'
                             script_str = script_str + ' && ' + co2_script_str
-                            _condition_body = ' if (' + script_str + ') { return true } '
-                        
+                            _condition_body = ' if (' + \
+                                script_str + ') { return true } '
+
                         query_body['query']['bool']['filter'].append(
                             {
-                            "script": {
                                 "script": {
-                                "source": _condition_body,
-                                "lang": "painless"
+                                    "script": {
+                                        "source": _condition_body,
+                                        "lang": "painless"
+                                    }
                                 }
                             }
-                            }
-                        )   
+                        )
 
                     logger.debug("re-re-search, query : %s", query_body)
                     try:
                         res = es.search(index=index_name, body=query_body)
                     except RequestError as e:
-                        logger.error(e.info['error']['caused_by']['caused_by']['reason'])
+                        logger.error(
+                            e.info['error']['caused_by']['caused_by']['reason'])
                         response['code'] = 500
                         response['message'] = 'Error occurred while querying'
                         return response
 
                     hits = res['hits']['hits']
-            
+
         if hits and len(hits) > 0:
             for hit in hits:
                 data = {
@@ -544,17 +583,19 @@ class GetSearchResult(Resource):
                 if 'productionyears' in source \
                     and source['productionyears'] is not None \
                         and source['productionyears']:
-                    data['productionyears'] = ''.join(source['productionyears'])
+                    data['productionyears'] = ''.join(
+                        source['productionyears'])
                 if 'generationyears' in source \
                     and source['generationyears'] is not None \
                         and source['generationyears']:
-                    data['generationyears'] = ''.join(source['generationyears'])
+                    data['generationyears'] = ''.join(
+                        source['generationyears'])
 
                 _list.append(data)
 
         logger.debug("total time spent - at: %s, value: %s",
                      now, (time.time() - start_time))
-                     
+
         if _list is not None and len(_list) > 0:
             response['results'] = _list
         else:
@@ -564,7 +605,7 @@ class GetSearchResult(Resource):
             }
 
         return response
-        
+
 # @ns.route('/search_')
 class GetSearchResult(Resource):
     @auth.login_required
@@ -1214,7 +1255,8 @@ class ReIndex(Resource):
                                                                     data['maxspeed'] = ''.join(
                                                                         modification['maxspeed'])
                                                                     combined = combined + \
-                                                                        data['maxspeed'] + space
+                                                                        data['maxspeed'] + \
+                                                                        space
                                                                 if 'acceleration' in modification:
                                                                     data['acceleration'] = ''.join(
                                                                         modification['acceleration'])
@@ -1251,4 +1293,4 @@ app.config['RESTX_MASK_HEADER'] = None
 app.register_blueprint(blueprint)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0' , port=4928, debug=False)
+    app.run(host='0.0.0.0', port=4928, debug=False)

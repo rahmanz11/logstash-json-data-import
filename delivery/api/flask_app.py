@@ -65,6 +65,21 @@ def auth_error():
     }
 
 
+v2_search_request = api.model('Search Request', {
+    'brand': fields.String(readOnly=True, description='The engine keyword', required=False),
+    'model': fields.String(readOnly=True, description='The engine keyword', required=False),
+    'generation': fields.String(readOnly=True, description='The engine keyword', required=False),
+    'engine': fields.String(readOnly=True, description='The engine keyword', required=False),
+    'engineDisplacement': fields.String(readOnly=True, description='The engine keyword', required=False),
+    'acceleration': fields.String(readOnly=True, description='The engine keyword', required=False),
+    'maxspeed': fields.String(readOnly=True, description='The engine keyword', required=False),
+    'productionyears': fields.String(readOnly=True, description='Generation years', required=False),
+    'generationyears': fields.String(readOnly=True, description='Generation years', required=False),
+    'coupe': fields.String(readOnly=True, description='Generation years', required=False),
+    'page': fields.Integer,
+    'size': fields.Integer
+})
+
 search_request = api.model('Search Request', {
     'keyword': fields.String(readOnly=True, description='The search keyword', required=True),
     'page': fields.Integer,
@@ -95,6 +110,230 @@ def get_values(s):
     co2 = m.group(1)
     keyword = s.split("[[")
     return keyword[0], co2
+
+def validate(value):
+    regex_letters = "[a-zA-Z0-9]+"
+    if re.search(regex_letters, value):
+        return "".join(re.findall(regex_letters, value))
+    else:
+        return None
+
+def prepare_value(request, field, query_body):
+    now = datetime.now()
+    regex_query = "[^a-zA-Z0-9$&+,:;=?@#|'<>.^*()%!]*"
+    value = request[field].strip()
+    logger.debug("time: %s, %s value: %s", now, field, value)
+    value = validate(value)
+    logger.debug('valid? %s', value)    
+    if value:
+        format = regex_query.join(value)
+        value = ".*" + format + ".*"
+        query_body['query']['bool']['should'].append(
+            build_query_param(value, field)
+            )
+            
+    return value, query_body
+
+def build_query_param(value, field_name):
+
+    max_determinized_states = 10000000
+    case_insensitive = True
+
+    return {
+        "regexp": {
+            field_name + ".keyword": {
+                "value": value,
+                "flags": "ALL",
+                "case_insensitive": case_insensitive,
+                "max_determinized_states": max_determinized_states,
+                "rewrite": "constant_score"
+            }
+        }
+    }
+
+
+@ns.route('/v2/search')
+class GetSearchResult(Resource):
+    @auth.login_required
+    @api.marshal_with(search_response)
+    @api.expect(search_request)
+    def post(self):
+
+        _list = []
+        start_time = time.time()
+        now = datetime.now()
+        response = {
+            'results': _list
+        }
+
+        page = 0
+        if 'page' in request.json:
+            page = request.json['page']
+            if page is None:
+                page = 0
+            elif page > 0:
+                page = page - 1
+
+        size = 50
+        if 'size' in request.json:
+            size = request.json['size']
+            if size is None or size < 0:
+                size = 50
+
+        query_body = {
+            "from": page,
+            "size": size,
+            "query": {
+                "bool": {
+                    "minimum_should_match": "75%",
+                    "should": []
+                }
+            },
+            "sort": [
+                {
+                    "_score": {
+                        "order": "desc"
+                    }
+                }
+            ]
+        }
+
+        brand = None
+        model = None
+        coupe = None
+        engine = None
+        generation = None
+        generationyears = None
+        productionyears = None
+        engineDisplacement = None
+        maxspeed = None
+        acceleration = None
+
+        i = 0
+        if 'brand' in request.json:
+            i += 1
+            brand, query_body = prepare_value(request.json, 'brand', query_body)
+
+        if 'model' in request.json:
+            i += 1
+            model, query_body = prepare_value(request.json, 'model', query_body)
+
+        if 'coupe' in request.json:
+            i += 1
+            coupe, query_body = prepare_value(request.json, 'coupe', query_body)
+
+        if 'engine' in request.json:
+            i += 1
+            engine, query_body = prepare_value(request.json, 'engine', query_body)
+
+        if 'generation' in request.json:
+            i += 1
+            generation, query_body = prepare_value(request.json, 'generation', query_body)
+
+        if 'generationyears' in request.json:
+            i += 1
+            generationyears, query_body = prepare_value(request.json, 'generationyears', query_body)
+
+        if 'productionyears' in request.json:
+            i += 1
+            productionyears, query_body = prepare_value(request.json, 'productionyears', query_body)
+
+        if 'engineDisplacement' in request.json:
+            i += 1
+            engineDisplacement, query_body = prepare_value(request.json, 'engineDisplacement', query_body)
+
+        if 'maxspeed' in request.json:
+            i += 1
+            maxspeed, query_body = prepare_value(request.json, 'maxspeed', query_body)
+
+        if 'acceleration' in request.json:
+            i += 1
+            acceleration, query_body = prepare_value(request.json, 'acceleration', query_body)
+
+        if not (brand or model
+                or engine or engineDisplacement
+                or coupe or generation
+                or generationyears or productionyears
+                or maxspeed or acceleration):
+            return {
+                'code': 401,
+                'message': 'Please provide input'
+            }
+        
+        
+        query_body['query']['bool']['minimum_should_match'] = i
+        
+        logger.debug("search query: %s", query_body)
+        index_name = "car_search_data"
+        try:
+            res = es.search(index=index_name, body=query_body)
+        except RequestError as e:
+            logger.error(e.info['error']['caused_by']
+                         ['caused_by']['reason'])
+            response['code'] = 500
+            response['message'] = 'Error occurred while querying'
+            return response
+
+        hits = res['hits']['hits']
+
+        if hits and len(hits) > 0:
+            for hit in hits:
+                data = {
+                    'generationyears': None,
+                    'brand': None,
+                    'coupe': None,
+                    'model': None,
+                    'engine': None,
+                    'generation': None,
+                    'productionyears': None
+                }
+                data['id'] = hit['_id']
+                source = hit['_source']
+                if 'brand' in source \
+                    and source['brand'] is not None \
+                        and source['brand']:
+                    data['brand'] = ''.join(source['brand'])
+                if 'coupe' in source \
+                    and source['coupe'] is not None \
+                        and source['coupe']:
+                    data['coupe'] = ''.join(source['coupe'])
+                if 'model' in source \
+                    and source['model'] is not None \
+                        and source['model']:
+                    data['model'] = ''.join(source['model'])
+                if 'generation' in source \
+                    and source['generation'] is not None \
+                        and source['generation']:
+                    data['generation'] = ''.join(source['generation'])
+                if 'engine' in source \
+                    and source['engine'] is not None \
+                        and source['engine']:
+                    data['engine'] = ''.join(source['engine'])
+                if 'productionyears' in source \
+                    and source['productionyears'] is not None \
+                        and source['productionyears']:
+                    data['productionyears'] = ''.join(
+                        source['productionyears'])
+                if 'generationyears' in source \
+                    and source['generationyears'] is not None \
+                        and source['generationyears']:
+                    data['generationyears'] = ''.join(
+                        source['generationyears'])
+
+                _list.append(data)
+
+        logger.debug("total time spent - at: %s, value: %s",
+                     now, (time.time() - start_time))
+
+        if _list is not None and len(_list) > 0:
+            response['results'] = _list
+        else:
+            return {
+                'code': 200,
+                'message': 'No cars matching your search'
+            }
+
+        return response
 
 
 @ns.route('/search')
@@ -490,21 +729,21 @@ class GetSearchResult(Resource):
                             query_body['query']['bool']['should'].append({
                                 "term": {
                                     "engineDisplacement.keyword": {
-                                        "value": keyword                                        
+                                        "value": keyword
                                     }
                                 }
                             })
                             query_body['query']['bool']['should'].append({
                                 "term": {
                                     "acceleration.keyword": {
-                                        "value": keyword                                        
+                                        "value": keyword
                                     }
                                 }
                             })
                             query_body['query']['bool']['should'].append({
                                 "term": {
                                     "maxspeed.keyword": {
-                                        "value": keyword                                        
+                                        "value": keyword
                                     }
                                 }
                             })
@@ -604,409 +843,6 @@ class GetSearchResult(Resource):
                 'message': 'No cars matching your search'
             }
 
-        return response
-
-# @ns.route('/search_')
-class GetSearchResult(Resource):
-    @auth.login_required
-    def post(self):
-
-        max_determinized_states = 10000000
-        start_time = time.time()
-        now = datetime.now()
-        keyword = request.json['keyword'].strip()
-        logger.debug("keyword - at: %s, value: %s", now, keyword)
-
-        letters = "".join(re.findall("[a-zA-Z0-9]+", keyword))
-        format = "[^a-zA-Z0-9]*".join(letters)
-        value = ".*" + format + ".*"
-        logger.debug("search value - at: %s, value: %s", now, value)
-
-        case_insensitive = True
-
-        query_body = {
-            "size": 10,
-            "query": {
-                "bool": {
-                    "minimum_should_match": 1,
-                    "should": [
-                        {
-                            "regexp": {
-                                "generation.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "brand.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "model.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "coupe.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "regexp": {
-                                "engine.keyword": {
-                                    "value": value,
-                                    "flags": "ALL",
-                                    "case_insensitive": case_insensitive,
-                                    "max_determinized_states": max_determinized_states,
-                                    "rewrite": "constant_score"
-                                }
-                            }
-                        },
-                        {
-                            "match": {
-                                "productionyears": {
-                                    "query": value
-                                }
-                            }
-                        },
-                        {
-                            "match": {
-                                "generationyears": {
-                                    "query": value
-                                }
-                            }
-                        }
-                    ]
-                }
-            },
-            "sort": [
-                {
-                    "_score": {
-                        "order": "desc"
-                    }
-                }
-            ]
-        }
-
-        if ' ' in keyword:
-            arr = keyword.split()
-            if arr is not None and len(arr) > 0:
-                query_body['query']['bool']['filter'] = []
-                script_str = ''
-                for str in arr:
-                    letters = "".join(re.findall("[a-zA-Z0-9]+", str))
-                    format = "[^a-zA-Z0-9]*".join(letters)
-                    value = ".*" + format + ".*"
-                    query_body['query']['bool']['should'].append({
-                        "regexp": {
-                            "generation.keyword": {
-                                "value": value,
-                                "flags": "ALL",
-                                "case_insensitive": case_insensitive,
-                                "max_determinized_states": max_determinized_states,
-                                "rewrite": "constant_score"
-                            }
-                        }
-                    })
-                    query_body['query']['bool']['should'].append({
-                        "regexp": {
-                            "engine.keyword": {
-                                "value": value,
-                                "flags": "ALL",
-                                "case_insensitive": case_insensitive,
-                                "max_determinized_states": max_determinized_states,
-                                "rewrite": "constant_score"
-                            }
-                        }
-                    })
-                    if script_str:
-                        script_str = script_str + ' && '
-                    script_str = script_str + \
-                        '(/' + value + '/i.matcher(doc["generation.keyword"].value).matches() || /' + \
-                        value + \
-                        '/i.matcher(doc["engine.keyword"].value).matches())'
-
-                _condition_body = ' if (' + script_str + ') { return true } '
-
-                query_body['query']['bool']['filter'].append(
-                    {
-                        "script": {
-                            "script": {
-                                "source": _condition_body,
-                                "lang": "painless"
-                            }
-                        }
-                    }
-                )
-
-        logger.debug(query_body)
-
-        response = {
-            'results': []
-        }
-
-        try:
-            res = es.search(index="car_search_data", body=query_body)
-        except RequestError as e:
-            logger.error(e.info['error']['caused_by']['caused_by']['reason'])
-            response['code'] = 500
-            response['message'] = 'Error occurred while querying'
-            return response
-        _list = []
-        hits = res['hits']['hits']
-        for hit in hits:
-            data = {
-                'generationyears': None,
-                'brand': None,
-                'coupe': None,
-                'model': None,
-                'generation': None,
-                'productionyears': None,
-                'combined': None
-            }
-            data['id'] = hit['_id']
-            source = hit['_source']
-            if 'brand' in source \
-                and source['brand'] is not None \
-                    and source['brand']:
-                data['brand'] = ''.join(source['brand'])
-            if 'coupe' in source \
-                and source['coupe'] is not None \
-                    and source['coupe']:
-                data['coupe'] = ''.join(source['coupe'])
-            if 'model' in source \
-                and source['model'] is not None \
-                    and source['model']:
-                data['model'] = ''.join(source['model'])
-            if 'generation' in source \
-                and source['generation'] is not None \
-                    and source['generation']:
-                data['generation'] = ''.join(source['generation'])
-            if 'engine' in source \
-                and source['engine'] is not None \
-                    and source['engine']:
-                data['engine'] = ''.join(source['engine'])
-            if 'productionyears' in source \
-                and source['productionyears'] is not None \
-                    and source['productionyears']:
-                data['productionyears'] = ''.join(source['productionyears'])
-            if 'generationyears' in source \
-                and source['generationyears'] is not None \
-                    and source['generationyears']:
-                data['generationyears'] = ''.join(source['generationyears'])
-
-            _list.append(data)
-
-        response['results'] = _list
-        logger.debug("total time spent - at: %s, value: %s",
-                     now, (time.time() - start_time))
-        return response
-
-
-# @ns.route('/search/detail')
-class GetSearchResultDetail(Resource):
-    @auth.login_required
-    def post(self):
-        time = datetime.now()
-        keyword = request.json['keyword']
-        logger.debug("keyword at %s: %s", time, keyword)
-
-        false = False
-        query_body = {
-            "size": 10,
-            "query": {
-                "constant_score": {
-                    "filter": {
-                        "nested": {
-                            "path": "models",
-                            "query": {
-                                "nested": {
-                                    "path": "models.model",
-                                    "query": {
-                                        "nested": {
-                                            "path": "models.model.generations",
-                                            "query": {
-                                                "nested": {
-                                                    "path": "models.model.generations.generation",
-                                                    "query": {
-                                                        "nested": {
-                                                            "path": "models.model.generations.generation.modifications",
-                                                            "query": {
-                                                                "nested": {
-                                                                    "path": "models.model.generations.generation.modifications.modification",
-                                                                    "query": {
-                                                                        "bool": {
-                                                                            "should": [
-                                                                                {
-                                                                                    "match": {
-                                                                                        "models.model.generations.generation.modifications.modification.generation": {
-                                                                                            "query": keyword,
-                                                                                            "minimum_should_match": 1
-                                                                                        }
-                                                                                    }
-                                                                                },
-                                                                                {
-                                                                                    "match": {
-                                                                                        "models.model.generations.generation.modifications.modification.brand": {
-                                                                                            "query": keyword,
-                                                                                            "minimum_should_match": 1
-                                                                                        }
-                                                                                    }
-                                                                                },
-                                                                                {
-                                                                                    "match": {
-                                                                                        "models.model.generations.generation.modifications.modification.model": {
-                                                                                            "query": keyword,
-                                                                                            "minimum_should_match": 1
-                                                                                        }
-                                                                                    }
-                                                                                },
-                                                                                {
-                                                                                    "match": {
-                                                                                        "models.model.generations.generation.modifications.modification.coupe": {
-                                                                                            "query": keyword,
-                                                                                            "minimum_should_match": 1
-                                                                                        }
-                                                                                    }
-                                                                                },
-                                                                                {
-                                                                                    "match": {
-                                                                                        "models.model.generations.generation.modifications.modification.engine": {
-                                                                                            "query": keyword,
-                                                                                            "minimum_should_match": 1
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            ]
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "boost": 1.2
-                }
-            },
-            "fields": [
-                "models.model.generations.generation.modifications.modification.generation",
-                "models.model.generations.generation.modifications.modification.brand",
-                "models.model.generations.generation.modifications.modification.model",
-                "models.model.generations.generation.modifications.modification.coupe",
-                "models.model.generations.generation.modifications.modification.engine",
-                "models.model.generations.generation.modifications.modification.productionyears",
-                "models.model.generations.generation.generationyears"
-            ],
-            "_source": false,
-            "highlight": {
-                "fields": {
-                    "models.model.generations.generation.modifications.modification.generation": {},
-                    "models.model.generations.generation.modifications.modification.brand": {},
-                    "models.model.generations.generation.modifications.modification.model": {},
-                    "models.model.generations.generation.modifications.modification.coupe": {},
-                    "models.model.generations.generation.modifications.modification.engine": {},
-                    "models.model.generations.generation.modifications.modification.productionyears": {},
-                    "models.model.generations.generation.generationyears": {}
-                }
-            }
-        }
-
-        response = {
-            'results': []
-        }
-
-        try:
-            res = es.search(index="car_information", body=query_body)
-        except Exception as e:
-            logger.error(e)
-            response['code'] = 500
-            response['message'] = 'Error occurred while querying'
-            return response
-
-        hits = res['hits']['hits']
-
-        if hits is not None and len(hits) > 0:
-            for hit in hits:
-                if hit['fields'] is not None and hit['fields']['models'] is not None and len(hit['fields']['models']) > 0:
-                    for model in hit['fields']['models']:
-                        for mv in model.values():
-                            for imv in mv:
-                                for imvs in imv.values():
-                                    for gns in imvs:
-                                        for gnv in gns.values():
-                                            for gn in gnv:
-                                                data = {}
-                                                data_available = False
-                                                if 'generationyears' in gn:
-                                                    data['generationyears'] = ''.join(
-                                                        gn['generationyears'])
-                                                    data_available = True
-
-                                                if 'modifications' in gn:
-                                                    for ms in gn['modifications']:
-                                                        for m in ms.values():
-                                                            for modification in m:
-                                                                if 'brand' in modification:
-                                                                    data['brand'] = ''.join(
-                                                                        modification['brand'])
-                                                                    data_available = True
-                                                                if 'coupe' in modification:
-                                                                    data['coupe'] = ''.join(
-                                                                        modification['coupe'])
-                                                                    data_available = True
-                                                                if 'model' in modification:
-                                                                    data['model'] = ''.join(
-                                                                        modification['model'])
-                                                                    data_available = True
-                                                                if 'generation' in modification:
-                                                                    data['generation'] = ''.join(
-                                                                        modification['generation'])
-                                                                    data_available = True
-                                                                if 'engine' in modification:
-                                                                    data['engine'] = ''.join(
-                                                                        modification['engine'])
-                                                                    data_available = True
-                                                                if 'productionyears' in modification:
-                                                                    data['productionyears'] = ''.join(
-                                                                        modification['productionyears'])
-                                                                    data_available = True
-
-                                                if data_available:
-                                                    response['results'].append(
-                                                        data)
-
-        response['total'] = len(response['results'])
-        logger.debug("total hits at: %s is %s", time, response['total'])
         return response
 
 

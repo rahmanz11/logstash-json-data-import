@@ -64,7 +64,6 @@ def auth_error():
         'message': 'Please provide valid auth credential'
     }
 
-
 v2_search_request = api.model('Search Request', {
     'brand': fields.String(readOnly=True, description='The engine keyword', required=False),
     'model': fields.String(readOnly=True, description='The engine keyword', required=False),
@@ -100,6 +99,22 @@ search_response = api.model('Search Response', {
     'results': fields.Nested(response_body)
 })
 
+v2_response_body = api.model('Response Body', {
+    'brand': fields.String(description='Car brand'),
+    'model': fields.String(description='Car model'),
+    'engine': fields.String(description='Car engine'),
+    'generation': fields.String(description='Car generation'),
+    'coupe': fields.String(description='Coupe'),
+    'engineDisplacement': fields.String(description='EngineDisplacement'),
+    'maxspeed': fields.String(description='Maxspeed'),
+    'acceleration': fields.String(description='Acceleration'),
+    'generationyears': fields.String(description='Generation years'),
+    'productionyears': fields.String(description='Production years')
+})
+
+v2_search_response = api.model('V2 Search Response', {
+    'results': fields.Nested(v2_response_body)
+})
 
 def has_numbers_in_3rd_brackets(s):
     return bool(re.search(r'\[\[\d+\]\]', s))
@@ -111,6 +126,7 @@ def get_values(s):
     keyword = s.split("[[")
     return keyword[0], co2
 
+
 def validate(value):
     regex_letters = "[a-zA-Z0-9]+"
     if re.search(regex_letters, value):
@@ -118,21 +134,31 @@ def validate(value):
     else:
         return None
 
+
+def is_alpha_numeric_present(value):
+    regex_letters = "[a-zA-Z0-9]+"
+    if re.search(regex_letters, value):
+        return value
+    else:
+        return None
+
+
 def prepare_value(request, field, query_body):
     now = datetime.now()
     regex_query = "[^a-zA-Z0-9$&+,:;=?@#|'<>.^*()%!]*"
     value = request[field].strip()
     logger.debug("time: %s, %s value: %s", now, field, value)
     value = validate(value)
-    logger.debug('valid? %s', value)    
+    logger.debug('valid? %s', value)
     if value:
         format = regex_query.join(value)
         value = ".*" + format + ".*"
         query_body['query']['bool']['should'].append(
             build_query_param(value, field)
-            )
-            
+        )
+
     return value, query_body
+
 
 def build_query_param(value, field_name):
 
@@ -152,7 +178,230 @@ def build_query_param(value, field_name):
     }
 
 
+def build_match_query(request, field, query_body):
+    now = datetime.now()
+    value = request[field].strip()
+
+    logger.debug("time: %s, %s value: %s", now, field, value)
+
+    value = is_alpha_numeric_present(value)
+
+    if validate:
+        query_body['query']['bool']['must'].append(
+            {"match":  {field: value}}
+        )
+        return value, query_body
+    
+    return None, None
+
+
 @ns.route('/v2/search')
+class GetSearchResult(Resource):
+    @auth.login_required
+    @api.marshal_with(v2_search_response)
+    @api.expect(search_request)
+    def post(self):
+
+        _list = []
+        start_time = time.time()
+        now = datetime.now()
+        response = {
+            'results': _list
+        }
+
+        page = 0
+        if 'page' in request.json:
+            page = request.json['page']
+            if page is None:
+                page = 0
+            elif page > 0:
+                page = page - 1
+
+        size = 50
+        if 'size' in request.json:
+            size = request.json['size']
+            if size is None or size < 0:
+                size = 50
+
+        query_body = {
+            "from": page,
+            "size": size,
+            "query": {
+                "bool": {
+                    "must": []
+                }
+            },
+            "sort": [
+                {
+                    "_score": {
+                        "order": "desc"
+                    }
+                }
+            ]
+        }
+
+        brand = None
+        model = None
+        coupe = None
+        engine = None
+        generation = None
+        generationyears = None
+        productionyears = None
+        engineDisplacement = None
+        maxspeed = None
+        acceleration = None
+
+        i = 0
+        if 'brand' in request.json:
+            i += 1
+            brand, query_body = build_match_query(
+                request.json, 'brand', query_body)
+
+        if 'model' in request.json:
+            i += 1
+            model, query_body = build_match_query(
+                request.json, 'model', query_body)
+
+        if 'coupe' in request.json:
+            i += 1
+            coupe, query_body = build_match_query(
+                request.json, 'coupe', query_body)
+
+        if 'engine' in request.json:
+            i += 1
+            engine, query_body = build_match_query(
+                request.json, 'engine', query_body)
+
+        if 'generation' in request.json:
+            i += 1
+            generation, query_body = build_match_query(
+                request.json, 'generation', query_body)
+
+        if 'generationyears' in request.json:
+            i += 1
+            generationyears, query_body = build_match_query(
+                request.json, 'generationyears', query_body)
+
+        if 'productionyears' in request.json:
+            i += 1
+            productionyears, query_body = build_match_query(
+                request.json, 'productionyears', query_body)
+
+        if 'engineDisplacement' in request.json:
+            i += 1
+            engineDisplacement, query_body = build_match_query(
+                request.json, 'engineDisplacement', query_body)
+
+        if 'maxspeed' in request.json:
+            i += 1
+            maxspeed, query_body = build_match_query(
+                request.json, 'maxspeed', query_body)
+
+        if 'acceleration' in request.json:
+            i += 1
+            acceleration, query_body = build_match_query(
+                request.json, 'acceleration', query_body)
+
+        if not (brand or model
+                or engine or engineDisplacement
+                or coupe or generation
+                or generationyears or productionyears
+                or maxspeed or acceleration):
+            return {
+                'code': 401,
+                'message': 'Please provide input'
+            }
+
+        logger.debug("search query: %s", query_body)
+        index_name = "car_search_data"
+        try:
+            res = es.search(index=index_name, body=query_body)
+        except RequestError as e:
+            logger.error(e.info['error']['caused_by']
+                         ['caused_by']['reason'])
+            response['code'] = 500
+            response['message'] = 'Error occurred while querying'
+            return response
+
+        hits = res['hits']['hits']
+
+        if hits and len(hits) > 0:
+            for hit in hits:
+                data = {
+                    'brand': None,
+                    'coupe': None,
+                    'model': None,
+                    'engine': None,
+                    'generation': None,
+                    'engineDisplacement': None,
+                    'maxspeed': None,
+                    'acceleration': None,
+                    'productionyears': None,
+                    'generationyears': None
+                }
+                data['id'] = hit['_id']
+                source = hit['_source']
+                if 'brand' in source \
+                    and source['brand'] is not None \
+                        and source['brand']:
+                    data['brand'] = ''.join(source['brand'])
+                if 'coupe' in source \
+                    and source['coupe'] is not None \
+                        and source['coupe']:
+                    data['coupe'] = ''.join(source['coupe'])
+                if 'model' in source \
+                    and source['model'] is not None \
+                        and source['model']:
+                    data['model'] = ''.join(source['model'])
+                if 'generation' in source \
+                    and source['generation'] is not None \
+                        and source['generation']:
+                    data['generation'] = ''.join(source['generation'])
+                if 'engine' in source \
+                    and source['engine'] is not None \
+                        and source['engine']:
+                    data['engine'] = ''.join(source['engine'])
+                if 'maxspeed' in source \
+                    and source['maxspeed'] is not None \
+                        and source['maxspeed']:
+                    data['maxspeed'] = ''.join(source['maxspeed'])
+                if 'engineDisplacement' in source \
+                    and source['engineDisplacement'] is not None \
+                        and source['engineDisplacement']:
+                    data['engineDisplacement'] = ''.join(source['engineDisplacement'])
+                if 'acceleration' in source \
+                    and source['acceleration'] is not None \
+                        and source['acceleration']:
+                    data['acceleration'] = ''.join(source['acceleration'])
+                if 'productionyears' in source \
+                    and source['productionyears'] is not None \
+                        and source['productionyears']:
+                    data['productionyears'] = ''.join(
+                        source['productionyears'])
+                if 'generationyears' in source \
+                    and source['generationyears'] is not None \
+                        and source['generationyears']:
+                    data['generationyears'] = ''.join(
+                        source['generationyears'])
+
+                _list.append(data)
+
+        logger.debug("total time spent - at: %s, value: %s",
+                     now, (time.time() - start_time))
+
+        if _list is not None and len(_list) > 0:
+            response['results'] = _list
+        else:
+            return {
+                'code': 200,
+                'message': 'No cars matching your search'
+            }
+
+        return response
+
+# @ns.route('/v2/search_')
+
+
 class GetSearchResult(Resource):
     @auth.login_required
     @api.marshal_with(search_response)
@@ -212,43 +461,53 @@ class GetSearchResult(Resource):
         i = 0
         if 'brand' in request.json:
             i += 1
-            brand, query_body = prepare_value(request.json, 'brand', query_body)
+            brand, query_body = prepare_value(
+                request.json, 'brand', query_body)
 
         if 'model' in request.json:
             i += 1
-            model, query_body = prepare_value(request.json, 'model', query_body)
+            model, query_body = prepare_value(
+                request.json, 'model', query_body)
 
         if 'coupe' in request.json:
             i += 1
-            coupe, query_body = prepare_value(request.json, 'coupe', query_body)
+            coupe, query_body = prepare_value(
+                request.json, 'coupe', query_body)
 
         if 'engine' in request.json:
             i += 1
-            engine, query_body = prepare_value(request.json, 'engine', query_body)
+            engine, query_body = prepare_value(
+                request.json, 'engine', query_body)
 
         if 'generation' in request.json:
             i += 1
-            generation, query_body = prepare_value(request.json, 'generation', query_body)
+            generation, query_body = prepare_value(
+                request.json, 'generation', query_body)
 
         if 'generationyears' in request.json:
             i += 1
-            generationyears, query_body = prepare_value(request.json, 'generationyears', query_body)
+            generationyears, query_body = prepare_value(
+                request.json, 'generationyears', query_body)
 
         if 'productionyears' in request.json:
             i += 1
-            productionyears, query_body = prepare_value(request.json, 'productionyears', query_body)
+            productionyears, query_body = prepare_value(
+                request.json, 'productionyears', query_body)
 
         if 'engineDisplacement' in request.json:
             i += 1
-            engineDisplacement, query_body = prepare_value(request.json, 'engineDisplacement', query_body)
+            engineDisplacement, query_body = prepare_value(
+                request.json, 'engineDisplacement', query_body)
 
         if 'maxspeed' in request.json:
             i += 1
-            maxspeed, query_body = prepare_value(request.json, 'maxspeed', query_body)
+            maxspeed, query_body = prepare_value(
+                request.json, 'maxspeed', query_body)
 
         if 'acceleration' in request.json:
             i += 1
-            acceleration, query_body = prepare_value(request.json, 'acceleration', query_body)
+            acceleration, query_body = prepare_value(
+                request.json, 'acceleration', query_body)
 
         if not (brand or model
                 or engine or engineDisplacement
@@ -259,10 +518,9 @@ class GetSearchResult(Resource):
                 'code': 401,
                 'message': 'Please provide input'
             }
-        
-        
+
         query_body['query']['bool']['minimum_should_match'] = i
-        
+
         logger.debug("search query: %s", query_body)
         index_name = "car_search_data"
         try:

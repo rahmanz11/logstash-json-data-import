@@ -134,12 +134,28 @@ PUT car_search_data
 {
   "settings": {
     "analysis": {
+      "analyzer": {
+        "tokenize_on_chars": {
+          "tokenizer": "tokenize_on_chars",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      },
       "normalizer": {
         "lower_case_normalizer": {
           "filter": [
             "lowercase"
           ],
           "type": "custom"
+        }
+      },
+      "tokenizer": {
+        "tokenize_on_chars": {
+          "type": "char_group",
+          "tokenize_on_chars": [
+            ","
+          ]
         }
       }
     },
@@ -233,27 +249,11 @@ PUT car_search_data
       },
       "productionyears": {
         "type": "text",
-        "analyzer": "standard",
-        "search_analyzer": "standard",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256,
-            "normalizer": "lower_case_normalizer"
-          }
-        }
+        "analyzer": "tokenize_on_chars"
       },
       "generationyears": {
         "type": "text",
-        "analyzer": "standard",
-        "search_analyzer": "standard",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256,
-            "normalizer": "lower_case_normalizer"
-          }
-        }
+        "analyzer": "tokenize_on_chars"
       },
       "modelYear": {
         "type": "text",
@@ -266,7 +266,7 @@ PUT car_search_data
             "normalizer": "lower_case_normalizer"
           }
         }
-      },        
+      },
       "maxspeed": {
         "type": "text",
         "analyzer": "standard",
@@ -278,7 +278,7 @@ PUT car_search_data
             "normalizer": "lower_case_normalizer"
           }
         }
-      },        
+      },
       "engineDisplacement": {
         "type": "text",
         "analyzer": "standard",
@@ -290,18 +290,11 @@ PUT car_search_data
             "normalizer": "lower_case_normalizer"
           }
         }
-      },        
+      },
       "acceleration": {
         "type": "text",
         "analyzer": "standard",
-        "search_analyzer": "standard",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256,
-            "normalizer": "lower_case_normalizer"
-          }
-        }
+        "search_analyzer": "standard"
       },
       "combined": {
         "type": "text",

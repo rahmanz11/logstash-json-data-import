@@ -389,14 +389,8 @@ class GetSearchResult(Resource):
         logger.debug("total time spent - at: %s, value: %s",
                      now, (time.time() - start_time))
 
-        if _list is not None and len(_list) > 0:
-            response['results'] = _list
-        else:
-            return {
-                'code': 200,
-                'message': 'No cars matching your search'
-            }
-
+        response['results'] = _list
+        
         return response
 
 # @ns.route('/v2/search_')

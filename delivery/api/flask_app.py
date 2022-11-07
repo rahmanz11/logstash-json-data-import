@@ -50,9 +50,9 @@ ns = api.namespace('car', description='Car Search API')
 @auth.verify_password
 def authenticate(username, password):
     if username and password:
-        if username == 'm2u' and password == 'Z$KF@S#SmU':
+        if username == 'user' and password == 'pass':
             return True
-        elif username == 'X032' and password == 'DKU!7X@nPY':
+        elif username == 'uu' and password == 'pp':
             return True
     return False
 

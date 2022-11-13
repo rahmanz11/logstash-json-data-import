@@ -134,6 +134,12 @@ def validate(value):
     else:
         return None
 
+def is_numeric_present(value):
+    regex_numbers = "[0-9]+"
+    if re.search(regex_numbers, value):
+        return value
+    else:
+        return None
 
 def is_alpha_numeric_present(value):
     regex_letters = "[a-zA-Z0-9]+"
@@ -178,6 +184,12 @@ def build_query_param(value, field_name):
     }
 
 
+def build_range_query(value, field, query_body, left, right):
+    query_body['query']['bool']['must'].append(
+        {"range":  {field: {"gte": left, "lte": right, "boost": 2.0}}}
+    )
+    return value, query_body
+
 def build_match_query(request, field, query_body):
     now = datetime.now()
     value = request[field].strip()
@@ -185,8 +197,7 @@ def build_match_query(request, field, query_body):
     logger.debug("time: %s, %s value: %s", now, field, value)
 
     value = is_alpha_numeric_present(value)
-
-    if validate:
+    if value:
         query_body['query']['bool']['must'].append(
             {"match":  {field: value}}
         )
@@ -294,13 +305,31 @@ class GetSearchResult(Resource):
 
         if 'maxspeed' in request.json:
             i += 1
-            maxspeed, query_body = build_match_query(
-                request.json, 'maxspeed', query_body)
+            now = datetime.now()
+            value = request.json['maxspeed'].strip()
+
+            logger.debug("time: %s, %s value: %s", now, 'maxspeed', value)
+
+            value = is_numeric_present(value)
+            if value and (int(value) > 0):
+                left = int(value) - 1
+                right = int(value) + 1
+                maxspeed, query_body = build_range_query(
+                    value, 'maxspeed', query_body, left, right)
 
         if 'acceleration' in request.json:
             i += 1
-            acceleration, query_body = build_match_query(
-                request.json, 'acceleration', query_body)
+            now = datetime.now()
+            value = request.json['acceleration'].strip()
+
+            logger.debug("time: %s, %s value: %s", now, 'acceleration', value)
+
+            value = is_numeric_present(value)
+            if value and (float(value) > 0):
+                left = float(value) - 0.1
+                right = float(value) + 0.1
+                maxspeed, query_body = build_range_query(
+                    value, 'acceleration', query_body, left, right)
 
         if not (brand or model
                 or engine or engineDisplacement
@@ -1121,7 +1150,11 @@ class ReIndex(Resource):
                 "models.model.generations.generation.modifications.modification.co2",
                 "models.model.generations.generation.modifications.modification.co2Min",
                 "models.model.generations.generation.modifications.modification.productionyears",
-                "models.model.generations.generation.generationyears"
+                "models.model.generations.generation.generationyears",
+                "models.model.generations.generation.modifications.modification.maxspeed",
+                "models.model.generations.generation.modifications.modification.acceleration",
+                "models.model.generations.generation.modifications.modification.engineDisplacement",
+                "models.model.generations.generation.modelYear"
             ],
             "_source": False
         }
@@ -1150,7 +1183,6 @@ class ReIndex(Resource):
                                                 if 'generationyears' in gn:
                                                     generationyears = ''.join(
                                                         gn['generationyears'])
-
                                                 if 'modifications' in gn:
                                                     for ms in gn['modifications']:
                                                         for m in ms.values():
@@ -1163,7 +1195,10 @@ class ReIndex(Resource):
                                                                     'co2': None,
                                                                     'co2Min': None,
                                                                     'generation': None,
+                                                                    'maxspeed': None,
                                                                     'engine': None,
+                                                                    'acceleration': None,
+                                                                    'engineDisplacement': None,
                                                                     'productionyears': None,
                                                                     'combined': None
                                                                 }
@@ -1206,6 +1241,22 @@ class ReIndex(Resource):
                                                                     combined = combined + \
                                                                         data['engine'] + \
                                                                         space
+                                                                if 'maxspeed' in modification:
+                                                                    data['maxspeed'] = ''.join(
+                                                                        modification['maxspeed'])
+                                                                    combined = combined + \
+                                                                        data['maxspeed'] + \
+                                                                        space
+                                                                if 'acceleration' in modification:
+                                                                    data['acceleration'] = ''.join(
+                                                                        modification['acceleration'])
+                                                                    combined = combined + \
+                                                                        data['acceleration'] + space
+                                                                if 'engineDisplacement' in modification:
+                                                                    data['engineDisplacement'] = ''.join(
+                                                                        modification['engineDisplacement'])
+                                                                    combined = combined + \
+                                                                        data['engineDisplacement'] + space
                                                                 if 'productionyears' in modification:
                                                                     data['productionyears'] = ''.join(
                                                                         modification['productionyears'])
@@ -1223,7 +1274,6 @@ class ReIndex(Resource):
         if list is not None and len(list) > 0:
             helpers.bulk(es, list, index='car_search_data')
         return response
-
 
 @ns.route('/reindex3')
 class ReIndex(Resource):

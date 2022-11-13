@@ -268,16 +268,7 @@ PUT car_search_data
         }
       },
       "maxspeed": {
-        "type": "text",
-        "analyzer": "standard",
-        "search_analyzer": "standard",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256,
-            "normalizer": "lower_case_normalizer"
-          }
-        }
+        "type": "integer"
       },
       "engineDisplacement": {
         "type": "text",
@@ -292,9 +283,7 @@ PUT car_search_data
         }
       },
       "acceleration": {
-        "type": "text",
-        "analyzer": "standard",
-        "search_analyzer": "standard"
+        "type": "float"
       },
       "combined": {
         "type": "text",

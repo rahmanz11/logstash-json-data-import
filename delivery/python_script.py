@@ -1,7 +1,7 @@
 from elasticsearch import Elasticsearch, helpers
 import json
 
-es = Elasticsearch(['http://95.179.199.14:9200'], basic_auth=('elastic', 'ksk3WMVlUlKXfm8pKXNP'))
+es = Elasticsearch(['http://esurl:9200'], basic_auth=('esuser', 'espass'))
 import json
   
 # Opening JSON file
